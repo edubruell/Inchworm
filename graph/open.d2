@@ -1,0 +1,161 @@
+# =============================================================================
+# wikiviewer — THE OPEN PATH: choosing a folder through to a populated sidebar.
+# Render:  d2 --layout elk --theme 0 --pad 60 open.d2 open.svg
+#
+# Read it as five legs, numbered. The window that CHOOSES is not the window
+# that ends up showing the project: opening always creates a second window,
+# and it is that window's IPC sender identity that decides what it may read.
+#
+# THE HUES ARE PROCESS BOUNDARIES, NOT INTERFACE COLOURS. wikiviewer gives each
+# project its own accent hue on screen; that has nothing to do with anything
+# here. This is a reading aid.
+#
+# EDITING NOTES
+#   1. `shape: rectangle` is mandatory on every card — a markdown label (`|md|`)
+#      otherwise renders borderless and ignores width/height. The size classes
+#      below carry it.
+#   2. Markdown labels collapse plain newlines — use <br/>. Keep lines short and
+#      ASCII; D2 measures the label from its own text and clips an overflow.
+# =============================================================================
+
+direction: down
+
+# ---- shared styles ---------------------------------------------------------
+# One hue carries one meaning, in all three of these diagrams:
+#   indigo = renderer-process code (sandboxed, no privileges)
+#   plum   = the preload bridge, the only way across the sandbox
+#   teal   = main-process code (the only place with privileges)
+#   sand   = bytes at rest on the filesystem
+#   brick  = a process this app started, which is not this app
+#   slate  = a guard that can refuse, and the refusal it emits (dashed)
+classes: {
+  # --- geometry -------------------------------------------------------------
+  box:  { shape: rectangle; width: 440; height: 210 }
+  wide: { shape: rectangle; width: 640; height: 210 }
+
+  # --- colour ---------------------------------------------------------------
+  ui:     { style: { fill: "#E8EAF9"; stroke: "#5B62B8"; stroke-width: 3; border-radius: 12; font-size: 24 } }
+  bridge: { style: { fill: "#F3E8F8"; stroke: "#8E5AA8"; stroke-width: 3; border-radius: 12; font-size: 24 } }
+  main:   { style: { fill: "#E1F0EE"; stroke: "#2F7F78"; stroke-width: 3; border-radius: 12; font-size: 24 } }
+  disk:   { style: { fill: "#F7EFDD"; stroke: "#B08328"; stroke-width: 3; border-radius: 12; font-size: 24 } }
+  child:  { style: { fill: "#FBE6E3"; stroke: "#C0483C"; stroke-width: 3; border-radius: 12; font-size: 24 } }
+  guard:  { style: { fill: "#ECEEF1"; stroke: "#6B7684"; stroke-width: 3; stroke-dash: 4; border-radius: 12; font-size: 24 } }
+
+  chip: { shape: rectangle; height: 80; style: { border-radius: 10; stroke-width: 3; font-size: 24 } }
+  band: { style: { fill: "#FFFFFF"; stroke: "#39424F"; stroke-width: 3; border-radius: 16; font-size: 38; bold: true } }
+}
+
+# ---- Legend ----------------------------------------------------------------
+legend: "How to read this diagram" {
+  near: top-center
+  grid-rows: 2
+  grid-gap: 26
+  class: band
+
+  l_ui:    |md **Renderer process** *(sandboxed)* | { class: chip; style: { fill: "#E8EAF9"; stroke: "#5B62B8" } }
+  l_br:    |md **Preload bridge** *(the only crossing)* | { class: chip; style: { fill: "#F3E8F8"; stroke: "#8E5AA8" } }
+  l_main:  |md **Main process** *(privileged)* | { class: chip; style: { fill: "#E1F0EE"; stroke: "#2F7F78" } }
+  l_disk:  |md **Bytes on disk** | { class: chip; style: { fill: "#F7EFDD"; stroke: "#B08328" } }
+  l_child: |md **A process this app started** | { class: chip; style: { fill: "#FBE6E3"; stroke: "#C0483C" } }
+  l_guard: |md **A guard, and its refusal** | { class: chip; style: { fill: "#ECEEF1"; stroke: "#6B7684"; stroke-dash: 4 } }
+  l_note:  |md *Hues mark processes.*<br/>*They are not the app's own colours.* | { class: chip; style: { fill: "#FFFFFF"; stroke: "#39424F" } }
+  l_num:   |md *Numbers are the five legs of the flow.* | { class: chip; style: { fill: "#FFFFFF"; stroke: "#39424F" } }
+}
+
+# ---- Leg 1: the window that chooses ----------------------------------------
+w0: "① The window that chooses — renderer process" {
+  grid-rows: 1
+  grid-gap: 40
+  class: band
+
+  picker: |md **`Picker`**<br/>"Choose folder..." or a recent row.<br/>Sends an absolute path and<br/>nothing else | { class: [ui; box] }
+  boot:   |md **`Bootstrap`** *(on refusal)*<br/>marker checklist · `markerAdvice`<br/>· "Start &lt;agent&gt; here" · "Check again"<br/>*The app never writes the schema* | { class: [guard; wide] }
+}
+
+# ---- Leg 1-2: main decides -------------------------------------------------
+mn: "②③ Main process — validate the folder, then serve the new window" {
+  grid-rows: 3
+  grid-gap: 34
+  class: band
+
+  dlg:   |md **`chooseDirectory`**<br/>native openDirectory dialog,<br/>"Choose a project with an llmwiki<br/>block in its CLAUDE.md" | { class: [main; box] }
+  zodp:  |md **`openProjectInput`**<br/>must be absolute, 1..4096 chars.<br/>Anything else is `bad-request`<br/>and nothing happens | { class: [guard; box] }
+  load:  |md **`loadProject`**<br/>stat the dir, then CLAUDE.md, then<br/>AGENTS.md. First file whose block<br/>parses wins | { class: [main; box] }
+  parse: |md **`parseClaudeBlock`** *(core)*<br/>fenced code blanked first, then<br/>`Wiki root:` `Journal:` `Kind:`.<br/>`safeRoot` rejects `/` `~` `..` and the root | { class: [guard; wide] }
+  store: |md **`projectStore.remember`**<br/>upsert into projects.json with a hue<br/>hashed from the path.<br/>Queued, temp-then-rename | { class: [main; box] }
+  openw: |md **`openWindow`**<br/>`createWindow()` then<br/>`registry.attach(id, project)` —<br/>attached BEFORE the renderer loads | { class: [main; box] }
+  curh:  |md **`project:current` -> `snapshot`**<br/>name and hue from the store,<br/>layout, and a fresh file list.<br/>Window identity from the IPC sender | { class: [main; box] }
+  list:  |md **`listWikiFiles`**<br/>one recursive readdir over the wiki<br/>root and the journal + stat the agent<br/>files. Dot paths dropped, sorted | { class: [main; box] }
+  readh: |md **`file:read` -> `readWikiFile`**<br/>`readFileInput` guard, then locate,<br/>realpath, containment, 2 MB cap.<br/>One round trip per listed path | { class: [guard; box] }
+}
+
+# ---- The bridge ------------------------------------------------------------
+pre: "Preload — contextBridge, `window.wiki`" {
+  grid-rows: 1
+  grid-gap: 40
+  class: band
+
+  api: |md **`createApi`**<br/>`chooseProject` · `openProject(dir)` · `listProjects`<br/>`currentProject()` · `readFile(path)` · `onProjectEvent`<br/>*casts every reply, validates nothing* | { class: [bridge; wide] }
+}
+
+# ---- Disk ------------------------------------------------------------------
+dk: "Disk" {
+  grid-rows: 1
+  grid-gap: 34
+  class: band
+
+  agentmd:  |md **CLAUDE.md / AGENTS.md**<br/>the only place a layout may<br/>be declared | { class: [disk; box] }
+  wiki:     |md **the wiki root tree**<br/>00_state · NN_notes · registers<br/>· archive/ | { class: [disk; box] }
+  journal:  |md **the journal tree**<br/>YYYY-MM-DD_slug.md | { class: [disk; box] }
+  projects: |md **projects.json**<br/>in userData: dir, hue,<br/>last opened | { class: [disk; box] }
+}
+
+# ---- Leg 4-5: the new window -----------------------------------------------
+w1: "④⑤ The NEW window — renderer process" {
+  grid-rows: 2
+  grid-gap: 40
+  class: band
+
+  app:    |md **`App.Window`**<br/>`currentProject()` resource.<br/>undefined -> show the Picker.<br/>Sets --project-hue on the document | { class: [ui; box] }
+  ns:     |md **`createNoteStore` + `parseNote`**<br/>reads EVERY listed path, one ticket<br/>per path so stale replies are dropped.<br/>Budget refusal -> shown as plain text | { class: [ui; box] }
+  nav:    |md **`buildNavigation` / `classify`**<br/>five sections in schema order; notes<br/>by number, registers by schema order,<br/>journal newest first | { class: [ui; box] }
+  side:   |md **`Sidebar` + `DebtSection`**<br/>status dot, cap gauge, contentions<br/>badge. `StatusBar` and the CmdK<br/>`Palette` read the same list | { class: [ui; box] }
+}
+
+# ---- wiring ----------------------------------------------------------------
+w0.picker -> pre.api: "chooseProject · openProject" { style.stroke-width: 5; style.stroke: "#39424F"; style.font-size: 26 }
+pre.api -> mn.dlg: "ipc project:choose" { style.stroke-width: 4; style.stroke: "#8E5AA8"; style.font-size: 24 }
+pre.api -> mn.zodp: "ipc project:open { dir }" { style.stroke-width: 5; style.stroke: "#8E5AA8"; style.font-size: 26 }
+mn.zodp -> w0.picker: "bad-request" { style.stroke-dash: 5; style.stroke: "#6B7684"; style.stroke-width: 3; style.font-size: 24 }
+mn.zodp -> mn.load: "an absolute path" { style.stroke-width: 4; style.stroke: "#2F7F78"; style.font-size: 24 }
+mn.load -> dk.agentmd: "read, in AGENT_FILES order" { style.stroke-width: 4; style.stroke: "#B08328"; style.font-size: 24 }
+mn.load -> mn.parse: "the file's text" { style.stroke-width: 4; style.stroke: "#2F7F78"; style.font-size: 24 }
+mn.parse -> mn.load: "layout, or a refusal kind" { style.stroke-dash: 5; style.stroke: "#6B7684"; style.stroke-width: 3; style.font-size: 24 }
+mn.load -> w0.boot: "no-llmwiki + markers" { style.stroke-dash: 5; style.stroke: "#6B7684"; style.stroke-width: 4; style.font-size: 26 }
+w0.boot -> mn.zodp: "'Check again'" { style.stroke-dash: 5; style.stroke: "#6B7684"; style.stroke-width: 3; style.font-size: 24 }
+mn.load -> mn.store: "ok(project)" { style.stroke-width: 4; style.stroke: "#2F7F78"; style.font-size: 24 }
+mn.store -> dk.projects: "queued, temp then rename" { style.stroke-width: 4; style.stroke: "#B08328"; style.font-size: 24 }
+mn.store -> mn.openw: "summary back · project elsewhere" { style.stroke-width: 4; style.stroke: "#2F7F78"; style.font-size: 24 }
+
+mn.openw -> w1.app: "a second BrowserWindow" { style.stroke-width: 5; style.stroke: "#2F7F78"; style.font-size: 26 }
+w1.app -> pre.api: "currentProject()" { style.stroke-width: 5; style.stroke: "#39424F"; style.font-size: 26 }
+pre.api -> mn.curh: "ipc project:current · no payload" { style.stroke-width: 5; style.stroke: "#8E5AA8"; style.font-size: 26 }
+mn.curh -> mn.list: "dir + layout" { style.stroke-width: 4; style.stroke: "#2F7F78"; style.font-size: 24 }
+mn.list -> dk.wiki: "recursive readdir" { style.stroke-width: 4; style.stroke: "#B08328"; style.font-size: 24 }
+mn.list -> dk.journal: "readdir · missing dir = empty" { style.stroke-width: 4; style.stroke: "#B08328"; style.font-size: 24 }
+mn.curh -> w1.app: "ProjectSnapshot { dir, name, hue, layout, files }" { style.stroke-width: 5; style.stroke: "#2F7F78"; style.font-size: 26 }
+
+w1.app -> w1.ns: "the file list" { style.stroke-width: 4; style.stroke: "#39424F"; style.font-size: 24 }
+w1.ns -> mn.readh: "one file:read per path" { style.stroke-width: 4; style.stroke: "#39424F"; style.font-size: 24 }
+mn.readh -> w1.ns: "{ text, sha, mtime } | outside-project | not-found | too-large | unreadable" { style.stroke-width: 4; style.stroke: "#2F7F78"; style.font-size: 24 }
+w1.app -> w1.nav: "files + layout" { style.stroke-width: 4; style.stroke: "#39424F"; style.font-size: 24 }
+w1.nav -> w1.side: "five NavGroups" { style.stroke-width: 4; style.stroke: "#39424F"; style.font-size: 24 }
+w1.ns -> w1.side: "status · caps · contentions" { style.stroke-width: 4; style.stroke: "#39424F"; style.font-size: 24 }
+
+dk.wiki -> mn.curh: "⑤ chokidar, one watcher per dir: change -> {file, path}, else coalesced {files} -> project:event to every window on the dir" { style.stroke-dash: 5; style.stroke: "#2F7F78"; style.stroke-width: 4; style.font-size: 26 }
+
+# Stacking order for ELK.
+w0 -> pre: { style.opacity: 0 }
+pre -> mn: { style.opacity: 0 }
+mn -> dk: { style.opacity: 0 }
+dk -> w1: { style.opacity: 0 }

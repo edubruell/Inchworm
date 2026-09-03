@@ -1,0 +1,174 @@
+# =============================================================================
+# wikiviewer — THE SAVE PATH: a keystroke through to disk and back out to
+# every window that has this project open.
+# Render:  d2 --layout elk --theme 0 --pad 60 save.d2 save.svg
+#
+# The point of this view is the BOUNDARY CROSSINGS. Every box lives inside the
+# process that actually runs it, and every edge is labelled with what crosses:
+# a payload, an IPC channel name, or the kind of refusal that comes back.
+#
+# THE HUES ARE PROCESS BOUNDARIES, NOT INTERFACE COLOURS. wikiviewer has its
+# own ideas about what colour means on screen (a per-project accent hue, cap
+# gauges, status dots); none of that has anything to do with this diagram.
+# This is a reading aid.
+#
+# EDITING NOTES
+#   1. `shape: rectangle` is mandatory on every card. A node whose label is a
+#      markdown block (`|md ... |`) renders as a bare text block with no border,
+#      and width/height are silently IGNORED. The size classes below carry it.
+#   2. Markdown labels collapse plain newlines — use <br/> for line breaks, and
+#      keep lines short: D2 measures the label from its own text, so an overlong
+#      line re-wraps and the last line can be clipped. Stay ASCII.
+# =============================================================================
+
+direction: down
+
+# ---- shared styles ---------------------------------------------------------
+# One hue carries one meaning, in all three of these diagrams:
+#   indigo = renderer-process code (sandboxed, no privileges)
+#   plum   = the preload bridge, the only way across the sandbox
+#   teal   = main-process code (the only place with privileges)
+#   sand   = bytes at rest on the filesystem
+#   brick  = a process this app started, which is not this app
+#   slate  = a guard that can refuse, and the refusal it emits (dashed)
+classes: {
+  # --- geometry -------------------------------------------------------------
+  box:   { shape: rectangle; width: 430; height: 200 }
+  wide:  { shape: rectangle; width: 620; height: 200 }
+  tall:  { shape: rectangle; width: 430; height: 250 }
+
+  # --- colour ---------------------------------------------------------------
+  ui:     { style: { fill: "#E8EAF9"; stroke: "#5B62B8"; stroke-width: 3; border-radius: 12; font-size: 24 } }
+  bridge: { style: { fill: "#F3E8F8"; stroke: "#8E5AA8"; stroke-width: 3; border-radius: 12; font-size: 24 } }
+  main:   { style: { fill: "#E1F0EE"; stroke: "#2F7F78"; stroke-width: 3; border-radius: 12; font-size: 24 } }
+  disk:   { style: { fill: "#F7EFDD"; stroke: "#B08328"; stroke-width: 3; border-radius: 12; font-size: 24 } }
+  child:  { style: { fill: "#FBE6E3"; stroke: "#C0483C"; stroke-width: 3; border-radius: 12; font-size: 24 } }
+  guard:  { style: { fill: "#ECEEF1"; stroke: "#6B7684"; stroke-width: 3; stroke-dash: 4; border-radius: 12; font-size: 24 } }
+
+  chip: { shape: rectangle; height: 80; style: { border-radius: 10; stroke-width: 3; font-size: 24 } }
+  band: { style: { fill: "#FFFFFF"; stroke: "#39424F"; stroke-width: 3; border-radius: 16; font-size: 38; bold: true } }
+}
+
+# ---- Legend ----------------------------------------------------------------
+legend: "How to read this diagram" {
+  near: top-center
+  grid-rows: 2
+  grid-gap: 26
+  class: band
+
+  l_ui:    |md **Renderer process** *(sandboxed)* | { class: chip; style: { fill: "#E8EAF9"; stroke: "#5B62B8" } }
+  l_br:    |md **Preload bridge** *(the only crossing)* | { class: chip; style: { fill: "#F3E8F8"; stroke: "#8E5AA8" } }
+  l_main:  |md **Main process** *(privileged)* | { class: chip; style: { fill: "#E1F0EE"; stroke: "#2F7F78" } }
+  l_disk:  |md **Bytes on disk** | { class: chip; style: { fill: "#F7EFDD"; stroke: "#B08328" } }
+  l_child: |md **A process this app started** | { class: chip; style: { fill: "#FBE6E3"; stroke: "#C0483C" } }
+  l_guard: |md **A guard, and its refusal** | { class: chip; style: { fill: "#ECEEF1"; stroke: "#6B7684"; stroke-dash: 4 } }
+  l_note:  |md *Hues mark processes.*<br/>*They are not the app's own colours.* | { class: chip; style: { fill: "#FFFFFF"; stroke: "#39424F" } }
+  l_num:   |md *Numbers are the order things happen.* | { class: chip; style: { fill: "#FFFFFF"; stroke: "#39424F" } }
+}
+
+# ---- Renderer: the window doing the writing --------------------------------
+w1: "① The window doing the writing — renderer process" {
+  grid-rows: 2
+  grid-gap: 40
+  class: band
+
+  cm:     |md **1. CodeMirror**<br/>`sourceExtensions` update listener<br/>calls `docText` with the state's<br/>OWN line separator | { class: [ui; box] }
+  drafts: |md **2. `Drafts`**<br/>`change` -> text only.<br/>`save` -> only if dirty or diverged,<br/>one write in flight per path | { class: [ui; box] }
+  hub:    |md **2'. `CommandHub`**<br/>the same `save` can arrive from<br/>the native menu instead of<br/>the Save button | { class: [ui; box] }
+  store:  |md **12. `NoteStore.settle`**<br/>bumps the per-path ticket, drops<br/>failures, installs the written bytes<br/>*without waiting for the watcher* | { class: [ui; box] }
+  views:  |md **13. Everything derived**<br/>`Note` prose · `Sidebar` dots and<br/>gauges · `StatusBar` contentions<br/>and unsaved · `Rail` backlinks | { class: [ui; box] }
+  banner: |md **12'. `Source` conflict banner**<br/>two buttons, no merge:<br/>*discard and reload* ·<br/>*overwrite the other change* | { class: [guard; box] }
+}
+
+# ---- Preload ---------------------------------------------------------------
+pre: "② Preload — contextBridge, `window.wiki`" {
+  grid-rows: 1
+  grid-gap: 40
+  class: band
+
+  api: |md **3. `createApi`**<br/>`writeFile(input)` · `readFile(path)`<br/>`onCommand` · `onProjectEvent`<br/>*casts every reply, validates nothing* | { class: [bridge; wide] }
+}
+
+# ---- Main ------------------------------------------------------------------
+mn: "③ Main process — the only side that may touch the disk" {
+  grid-rows: 2
+  grid-gap: 36
+  class: band
+
+  menu:   |md **0. Save menu item**<br/>CmdS -> `send(focusedId, {kind:'save'})`<br/>over `app:command` | { class: [main; box] }
+  zod:    |md **4. `writeFileInput`**<br/>relative path, no `..` segment,<br/>no backslash, no NUL,<br/>text and baseSha bounded | { class: [guard; box] }
+  locate: |md **5. `locate` + `realInside`**<br/>inside root -> is an agent file or<br/>under wiki/journal -> realpath both<br/>-> inside root again | { class: [guard; box] }
+  lock:   |md **6. `serialised`**<br/>module-level queue keyed on the<br/>REAL path: two windows saving the<br/>same file chain, never race | { class: [main; box] }
+  sha:    |md **7. `currentSha` compare**<br/>sha256 of the bytes on disk vs the<br/>draft's `baseSha`.<br/>Empty sha means "did not exist" | { class: [guard; box] }
+  atomic: |md **8. `writeAtomic`**<br/>dot-prefixed temp file with a UUID<br/>in the same directory,<br/>then rename over the target | { class: [main; box] }
+  watch:  |md **10. `watchProject`** *(chokidar)*<br/>one per project dir, shared by every<br/>window on it. Dot paths ignored,<br/>100 ms write-settle | { class: [main; box] }
+  fan:    |md **11. `projectEventFor` + `broadcast`**<br/>addressed by directory:<br/>`registry.windowsOn(dir)`,<br/>including the writer | { class: [main; box] }
+}
+
+# ---- Disk ------------------------------------------------------------------
+dk: "④ Disk" {
+  grid-rows: 1
+  grid-gap: 40
+  class: band
+
+  tmp:    |md **9a. `.name.UUID.tmp`**<br/>same directory, so the rename is<br/>atomic. Invisible to the watcher<br/>because it is a dot path | { class: [disk; box] }
+  target: |md **9b. The wiki file**<br/>UTF-8, byte-for-byte: BOM, CRLF and<br/>a missing trailing newline all<br/>survive the round trip | { class: [disk; box] }
+}
+
+# ---- Renderer: every other window ------------------------------------------
+w2: "⑤ Every other window on the same project — renderer process" {
+  grid-rows: 1
+  grid-gap: 40
+  class: band
+
+  store2: |md **`NoteStore`**<br/>re-reads over `file:read` if the path<br/>is still in its list, ticket-guarded.<br/>Prose re-renders | { class: [ui; box] }
+  state2: |md **`editState`**<br/>a draft here becomes `stale`<br/>(nothing typed) or `diverged`<br/>(something typed). Editor text untouched | { class: [ui; box] }
+}
+
+# ---- Anything else writing the file ----------------------------------------
+ext: "⑥ Anything else writing the same file" {
+  grid-rows: 1
+  grid-gap: 40
+  class: band
+
+  agent: |md **The agent in the drawer,<br/>or any other editor**<br/>writes the target directly.<br/>Outside the app's own queue | { class: [child; box] }
+}
+
+# ---- wiring ----------------------------------------------------------------
+w1.cm -> w1.drafts: "every change" { style.stroke-width: 4; style.stroke: "#39424F"; style.font-size: 24 }
+w1.drafts -> pre.api: "3. writeFile + baseSha" { style.stroke-width: 5; style.stroke: "#39424F"; style.font-size: 26 }
+w1.hub -> w1.drafts: "save -> saveSelected()" { style.stroke-width: 4; style.stroke: "#39424F"; style.font-size: 24 }
+
+mn.menu -> pre.api: "app:command · focused only" { style.stroke-width: 4; style.stroke: "#2F7F78"; style.font-size: 24 }
+pre.api -> w1.hub: "onCommand" { style.stroke-width: 4; style.stroke: "#8E5AA8"; style.font-size: 24 }
+
+pre.api -> mn.zod: "invoke file:write" { style.stroke-width: 5; style.stroke: "#8E5AA8"; style.font-size: 26 }
+mn.zod -> mn.locate: "valid · project from sender" { style.stroke-width: 4; style.stroke: "#2F7F78"; style.font-size: 24 }
+mn.zod -> w1.banner: "bad-request / no-project" { style.stroke-dash: 5; style.stroke: "#6B7684"; style.stroke-width: 3; style.font-size: 24 }
+mn.locate -> mn.lock: "real path" { style.stroke-width: 4; style.stroke: "#2F7F78"; style.font-size: 24 }
+mn.locate -> w1.banner: "outside-project · not-found" { style.stroke-dash: 5; style.stroke: "#6B7684"; style.stroke-width: 3; style.font-size: 24 }
+mn.lock -> mn.sha: "our turn" { style.stroke-width: 4; style.stroke: "#2F7F78"; style.font-size: 24 }
+mn.sha -> dk.target: "read + hash" { style.stroke-dash: 4; style.stroke: "#B08328"; style.stroke-width: 3; style.font-size: 24 }
+mn.sha -> w1.banner: "conflict · nothing written" { style.stroke-dash: 5; style.stroke: "#6B7684"; style.stroke-width: 4; style.font-size: 26 }
+mn.sha -> mn.atomic: "shas match" { style.stroke-width: 4; style.stroke: "#2F7F78"; style.font-size: 24 }
+mn.atomic -> dk.tmp: "write UTF-8 bytes" { style.stroke-width: 4; style.stroke: "#B08328"; style.font-size: 24 }
+dk.tmp -> dk.target: "rename(2)" { style.stroke-width: 5; style.stroke: "#B08328"; style.font-size: 26 }
+
+dk.target -> w1.store: "TRACK A · ok {sha, mtime}" { style.stroke-width: 5; style.stroke: "#39424F"; style.font-size: 26 }
+w1.store -> w1.views: "one reactive graph" { style.stroke-width: 4; style.stroke: "#39424F"; style.font-size: 24 }
+w1.banner -> mn.zod: "overwrite · re-guard" { style.stroke-dash: 5; style.stroke: "#6B7684"; style.stroke-width: 3; style.font-size: 24 }
+
+dk.target -> mn.watch: "TRACK B: OS file event" { style.stroke-width: 4; style.stroke: "#B08328"; style.font-size: 24 }
+mn.watch -> mn.fan: "file, or coalesced files" { style.stroke-width: 4; style.stroke: "#2F7F78"; style.font-size: 24 }
+mn.fan -> w2.store2: "project:event · every window" { style.stroke-width: 5; style.stroke: "#2F7F78"; style.font-size: 26 }
+w2.store2 -> w2.state2: "new disk sha" { style.stroke-width: 4; style.stroke: "#39424F"; style.font-size: 24 }
+w2.state2 -> mn.zod: "stale baseSha -> conflict" { style.stroke-dash: 5; style.stroke: "#6B7684"; style.stroke-width: 3; style.font-size: 24 }
+
+ext.agent -> dk.target: "lands between 7 and 9b: lost" { style.stroke-width: 4; style.stroke: "#C0483C"; style.font-size: 26 }
+
+# Stacking order for ELK.
+w1 -> pre: { style.opacity: 0 }
+pre -> mn: { style.opacity: 0 }
+mn -> dk: { style.opacity: 0 }
+dk -> w2: { style.opacity: 0 }
+w2 -> ext: { style.opacity: 0 }

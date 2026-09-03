@@ -1,0 +1,2 @@
+- append-only, one line each: lint verdicts, splits, migrations, process notes
+- 2026-08-24 lint: clean, no findings

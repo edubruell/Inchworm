@@ -1,0 +1,166 @@
+# =============================================================================
+# wikiviewer — THE CHILD-PROCESS PATH: terminal panes, and the checker
+# subprocess. Two spawn sites, both in the main process, and they are opposites:
+# a pane exists only because someone clicked, and a checker run happens because
+# a file changed.
+# Render:  d2 --layout elk --theme 0 --pad 60 spawn.d2 spawn.svg
+#
+# THE HUES ARE PROCESS BOUNDARIES, NOT INTERFACE COLOURS. wikiviewer paints an
+# accent hue per project and tints its own terminal theme; none of that is what
+# brick or teal mean here. This is a reading aid.
+#
+# EDITING NOTES
+#   1. `shape: rectangle` is mandatory on every card — a markdown label (`|md|`)
+#      otherwise renders borderless and ignores width/height. The size classes
+#      below carry it.
+#   2. Markdown labels collapse plain newlines — use <br/>. Keep lines short and
+#      ASCII; D2 measures the label from its own text and clips an overflow.
+# =============================================================================
+
+direction: down
+
+# ---- shared styles ---------------------------------------------------------
+# One hue carries one meaning, in all three of these diagrams:
+#   indigo = renderer-process code (sandboxed, no privileges)
+#   plum   = the preload bridge, the only way across the sandbox
+#   teal   = main-process code (the only place with privileges)
+#   sand   = bytes at rest on the filesystem
+#   brick  = a process this app started, which is not this app
+#   slate  = a guard that can refuse, and the refusal it emits (dashed)
+classes: {
+  # --- geometry -------------------------------------------------------------
+  box:  { shape: rectangle; width: 440; height: 210 }
+  wide: { shape: rectangle; width: 650; height: 210 }
+
+  # --- colour ---------------------------------------------------------------
+  ui:     { style: { fill: "#E8EAF9"; stroke: "#5B62B8"; stroke-width: 3; border-radius: 12; font-size: 24 } }
+  bridge: { style: { fill: "#F3E8F8"; stroke: "#8E5AA8"; stroke-width: 3; border-radius: 12; font-size: 24 } }
+  main:   { style: { fill: "#E1F0EE"; stroke: "#2F7F78"; stroke-width: 3; border-radius: 12; font-size: 24 } }
+  disk:   { style: { fill: "#F7EFDD"; stroke: "#B08328"; stroke-width: 3; border-radius: 12; font-size: 24 } }
+  child:  { style: { fill: "#FBE6E3"; stroke: "#C0483C"; stroke-width: 4; border-radius: 12; font-size: 24 } }
+  guard:  { style: { fill: "#ECEEF1"; stroke: "#6B7684"; stroke-width: 3; stroke-dash: 4; border-radius: 12; font-size: 24 } }
+
+  chip: { shape: rectangle; height: 80; style: { border-radius: 10; stroke-width: 3; font-size: 24 } }
+  band: { style: { fill: "#FFFFFF"; stroke: "#39424F"; stroke-width: 3; border-radius: 16; font-size: 38; bold: true } }
+}
+
+# ---- Legend ----------------------------------------------------------------
+legend: "How to read this diagram" {
+  near: top-center
+  grid-rows: 2
+  grid-gap: 26
+  class: band
+
+  l_ui:    |md **Renderer process** *(sandboxed)* | { class: chip; style: { fill: "#E8EAF9"; stroke: "#5B62B8" } }
+  l_br:    |md **Preload bridge** *(the only crossing)* | { class: chip; style: { fill: "#F3E8F8"; stroke: "#8E5AA8" } }
+  l_main:  |md **Main process** *(privileged)* | { class: chip; style: { fill: "#E1F0EE"; stroke: "#2F7F78" } }
+  l_disk:  |md **Bytes on disk** | { class: chip; style: { fill: "#F7EFDD"; stroke: "#B08328" } }
+  l_child: |md **A process this app started** | { class: chip; style: { fill: "#FBE6E3"; stroke: "#C0483C" } }
+  l_guard: |md **A guard, and its refusal** | { class: chip; style: { fill: "#ECEEF1"; stroke: "#6B7684"; stroke-dash: 4 } }
+  l_note:  |md *Hues mark processes.*<br/>*They are not the app's own colours.* | { class: chip; style: { fill: "#FFFFFF"; stroke: "#39424F" } }
+  l_num:   |md *Left column: a pane, started by a click.*<br/>*Right column: a checker, started by a file change.* | { class: chip; style: { fill: "#FFFFFF"; stroke: "#39424F" } }
+}
+
+# ---- Renderer --------------------------------------------------------------
+rn: "① Renderer process — a click on the left, a file change on the right" {
+  grid-rows: 2
+  grid-gap: 36
+  class: band
+
+  drawer: |md **`Drawer`**<br/>one "+ &lt;label&gt;" per configured<br/>launcher, plus "+ shell".<br/>Also the `Bootstrap` panel's button | { class: [ui; box] }
+  terms:  |md **`createTerminals`**<br/>sends { preset, cols, rows,<br/>launcherId }. NEVER a command line.<br/>64 000-char backlog before attach | { class: [ui; box] }
+  pane:   |md **`Pane`** *(xterm.js)*<br/>keystrokes, resize, and a file drop<br/>that types a shell-quoted path<br/>with NO trailing newline | { class: [ui; box] }
+  setg:   |md **`Settings` sheet**<br/>where the command line actually<br/>lives. The renderer can write one<br/>here and then start it by id | { class: [guard; box] }
+  pv:     |md **`ProjectView` + `createDebtStore`**<br/>refresh on mount and on EVERY<br/>project event for this dir.<br/>One in flight, one queued | { class: [ui; box] }
+  dsec:   |md **`DebtSection`** — "Not written up"<br/>ordered unstamped, unswept,<br/>unfiled, unlinked. A row opens a file<br/>only if it is in this window's list | { class: [ui; box] }
+}
+
+# ---- Preload ---------------------------------------------------------------
+pre: "② Preload — contextBridge, `window.wiki`" {
+  grid-rows: 1
+  grid-gap: 40
+  class: band
+
+  api: |md **`createApi`**<br/>`startPty` · `writePty` · `resizePty` · `killPty`<br/>`setSettings` · `readDebt` · `onPtyEvent` · `onProjectEvent`<br/>*a fixed method per fixed channel name* | { class: [bridge; wide] }
+}
+
+# ---- Main ------------------------------------------------------------------
+mn: "③ Main process — the only place a child process is created" {
+  grid-rows: 3
+  grid-gap: 34
+  class: band
+
+  ptyh:  |md **`pty:start` handler**<br/>`startPtyInput`: preset is an ENUM,<br/>geometry 1..1000, launcherId <= 64.<br/>Window id from the IPC sender | { class: [guard; box] }
+  reg:   |md **`Registry`**<br/>cwd = the window's project dir,<br/>else the folder it last FAILED to<br/>open. The renderer picks neither | { class: [main; box] }
+  sset:  |md **`SettingsStore` + `launcherFor`**<br/>id -> command, via settings.json.<br/>`validateSettings`: <= 8 rows,<br/>label <= 40, command <= 200 | { class: [main; box] }
+  pty:   |md **`PtyHost`**<br/>4 panes per window, ids never reused,<br/>`owned()` refuses write/resize/kill<br/>from any other window | { class: [main; box] }
+  spawn: |md **the spawner** *(index.ts)*<br/>node-pty, cwd = project,<br/>xterm-256color, and a FULL copy of<br/>`process.env` — nothing filtered | { class: [main; box] }
+  watch: |md **`watchProject`** *(chokidar)*<br/>CLAUDE.md, AGENTS.md, the wiki root,<br/>the journal. 100 ms settle.<br/>This is what makes checkers run | { class: [main; box] }
+  dhost: |md **`DebtHost`**<br/>sha256 of each checker pinned on<br/>FIRST SIGHT, refused if the bytes<br/>later change. One round app-wide | { class: [guard; box] }
+  run:   |md **`runWith`** *(execFile)*<br/>`shell: false`, 20 s, SIGKILL, 4 MB<br/>stdout. Project dir is ONE argv<br/>element. Exit code captured, never read | { class: [main; box] }
+  findpy:|md **`findPython`** *(once, on ENOENT)*<br/>`$SHELL -l -c 'command -v python3'`,<br/>retried only if the answer is<br/>an absolute path | { class: [main; box] }
+}
+
+# ---- Child processes -------------------------------------------------------
+ch: "④ Child processes — everything below this line is not this app" {
+  grid-rows: 1
+  grid-gap: 36
+  class: band
+
+  shell: |md **`$SHELL -l`** *(shell preset)*<br/>**`$SHELL -l -i -c "<command>"`** *(agent)*<br/>`$SHELL` falls back to /bin/zsh.<br/>Full environment, cwd = the project | { class: [child; wide] }
+  sweep: |md **`wiki-sweepcheck.py`**<br/>`--json --no-persist <dir>`<br/>every row read as kind `unstamped`.<br/>No cwd option: inherits the app's | { class: [child; box] }
+  trig:  |md **`wiki-trigger.py`**<br/>`--json --no-persist <dir>`<br/>its own `kind` string is passed<br/>through, anything else -> `unlinked` | { class: [child; box] }
+}
+
+# ---- Disk ------------------------------------------------------------------
+dk: "Disk" {
+  grid-rows: 1
+  grid-gap: 36
+  class: band
+
+  proj:   |md **the project directory**<br/>cwd for a pane;<br/>one argv element for a checker | { class: [disk; box] }
+  bundle: |md **`skills/llmwiki/`**<br/>resourcesPath when packaged,<br/>appPath in development.<br/>Only the entry script is hashed | { class: [disk; box] }
+  sj:     |md **settings.json** *(userData)*<br/>the launcher command lines.<br/>Anything on the machine can edit<br/>this file | { class: [disk; box] }
+}
+
+# ---- wiring: the pane ------------------------------------------------------
+rn.drawer -> rn.terms: "start(preset, 80, 24, launcher?)" { style.stroke-width: 4; style.stroke: "#39424F"; style.font-size: 24 }
+rn.terms -> pre.api: "startPty { preset, cols, rows, launcherId }" { style.stroke-width: 5; style.stroke: "#39424F"; style.font-size: 26 }
+pre.api -> mn.ptyh: "ipc pty:start" { style.stroke-width: 5; style.stroke: "#8E5AA8"; style.font-size: 26 }
+mn.ptyh -> rn.terms: "a refusal sentence, never a crash" { style.stroke-dash: 5; style.stroke: "#6B7684"; style.stroke-width: 3; style.font-size: 24 }
+mn.ptyh -> mn.reg: "which folder?" { style.stroke-width: 4; style.stroke: "#2F7F78"; style.font-size: 24 }
+mn.ptyh -> mn.sset: "launcherId -> command" { style.stroke-width: 4; style.stroke: "#2F7F78"; style.font-size: 24 }
+rn.setg -> pre.api: "validated, then broadcast" { style.stroke-width: 4; style.stroke: "#39424F"; style.font-size: 24 }
+mn.sset -> dk.sj: "repaired · temp-then-rename" { style.stroke-dash: 4; style.stroke: "#B08328"; style.stroke-width: 3; style.font-size: 24 }
+mn.ptyh -> mn.pty: "start(windowId, cwd, { preset, agentCommand })" { style.stroke-width: 4; style.stroke: "#2F7F78"; style.font-size: 24 }
+mn.pty -> mn.spawn: "argsFor(preset, command)" { style.stroke-width: 4; style.stroke: "#2F7F78"; style.font-size: 24 }
+mn.spawn -> ch.shell: "fork a login shell" { style.stroke-width: 6; style.stroke: "#C0483C"; style.font-size: 28 }
+mn.spawn -> dk.proj: "cwd" { style.stroke-dash: 4; style.stroke: "#B08328"; style.stroke-width: 3; style.font-size: 24 }
+ch.shell -> mn.pty: "onData / onExit" { style.stroke-width: 4; style.stroke: "#C0483C"; style.font-size: 24 }
+mn.pty -> pre.api: "pty:event · owner only" { style.stroke-width: 5; style.stroke: "#2F7F78"; style.font-size: 26 }
+pre.api -> rn.pane: "live sink, or backlog" { style.stroke-width: 4; style.stroke: "#8E5AA8"; style.font-size: 24 }
+rn.pane -> mn.pty: "write · resize · kill, all owned()" { style.stroke-width: 4; style.stroke: "#39424F"; style.font-size: 24 }
+
+# ---- wiring: the checkers --------------------------------------------------
+dk.proj -> mn.watch: "a save — user OR agent" { style.stroke-width: 4; style.stroke: "#B08328"; style.font-size: 24 }
+mn.watch -> rn.pv: "project:event · every window" { style.stroke-width: 5; style.stroke: "#2F7F78"; style.font-size: 26 }
+rn.pv -> pre.api: "readDebt() · no payload" { style.stroke-width: 5; style.stroke: "#39424F"; style.font-size: 26 }
+rn.dsec -> rn.pv: "the refresh control" { style.stroke-width: 4; style.stroke: "#39424F"; style.font-size: 24 }
+pre.api -> mn.dhost: "ipc debt:read · from sender" { style.stroke-width: 5; style.stroke: "#8E5AA8"; style.font-size: 26 }
+mn.dhost -> dk.bundle: "bundle + CONST name, sha256" { style.stroke-width: 4; style.stroke: "#B08328"; style.font-size: 24 }
+mn.dhost -> rn.dsec: "no-bundle · no-python · partial" { style.stroke-dash: 5; style.stroke: "#6B7684"; style.stroke-width: 3; style.font-size: 24 }
+mn.dhost -> mn.run: "two runs in parallel" { style.stroke-width: 4; style.stroke: "#2F7F78"; style.font-size: 24 }
+mn.run -> mn.findpy: "ENOENT · once per process" { style.stroke-dash: 5; style.stroke: "#6B7684"; style.stroke-width: 3; style.font-size: 24 }
+mn.findpy -> ch.shell: "a login shell, to find python3" { style.stroke-width: 4; style.stroke: "#C0483C"; style.font-size: 24 }
+mn.run -> ch.sweep: "execFile python3" { style.stroke-width: 6; style.stroke: "#C0483C"; style.font-size: 28 }
+mn.run -> ch.trig: "execFile python3" { style.stroke-width: 6; style.stroke: "#C0483C"; style.font-size: 28 }
+ch.sweep -> mn.run: "stdout only · stderr dropped" { style.stroke-width: 4; style.stroke: "#C0483C"; style.font-size: 24 }
+ch.trig -> mn.run: "stdout · null = no answer" { style.stroke-width: 4; style.stroke: "#C0483C"; style.font-size: 24 }
+mn.run -> rn.dsec: "DebtReport { items, failed, checkedMs } — a path only if it is already in the list" { style.stroke-width: 5; style.stroke: "#2F7F78"; style.font-size: 26 }
+ch.sweep -> dk.proj: "--no-persist is a request" { style.stroke-dash: 5; style.stroke: "#C0483C"; style.stroke-width: 3; style.font-size: 24 }
+
+# Stacking order for ELK.
+rn -> pre: { style.opacity: 0 }
+pre -> mn: { style.opacity: 0 }
+mn -> ch: { style.opacity: 0 }
+ch -> dk: { style.opacity: 0 }

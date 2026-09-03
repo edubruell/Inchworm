@@ -1,0 +1,1 @@
+Round 20260810a. VERDICT: the second stage reproduced; carried into 04_results.

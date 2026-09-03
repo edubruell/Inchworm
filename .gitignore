@@ -1,0 +1,18 @@
+# agent-facing memory layer (never committed). Anchored with a leading slash:
+# unanchored, it also swallows tests/fixtures/sample-wiki/local_context/ and the
+# fixture that IS the schema spec is silently never committed.
+/local_context/
+
+# node / build
+node_modules/
+dist/
+out/
+.astro/
+*.log
+.DS_Store
+coverage/
+release/
+
+# python bytecode (hook fixtures)
+__pycache__/
+*.pyc
