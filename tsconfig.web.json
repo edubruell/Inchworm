@@ -1,0 +1,19 @@
+{
+  "extends": "./tsconfig.base.json",
+  // `tests/support/api.ts` is the one test-support file the renderer tests import;
+  // the rest of `tests/support` is node-only and would not typecheck here.
+  "include": [
+    "src/renderer/**/*.ts",
+    "src/renderer/**/*.tsx",
+    "src/core/**/*.ts",
+    "src/shared/**/*.ts",
+    "tests/support/api.ts"
+  ],
+  "compilerOptions": {
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": ["vite/client"],
+    "jsx": "preserve",
+    "jsxImportSource": "solid-js",
+    "outDir": "node_modules/.cache/tsc/web"
+  }
+}

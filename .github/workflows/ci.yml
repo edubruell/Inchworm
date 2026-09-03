@@ -1,0 +1,24 @@
+name: check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    # The gates only mean something if something other than a human runs them.
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      # The build runs before the suite: `tests/csp.test.ts` checks the built
+      # copy of index.html, and a gate that skips itself is not a gate.
+      - run: npx electron-vite build
+      - run: npm test

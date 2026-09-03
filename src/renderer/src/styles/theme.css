@@ -1,0 +1,468 @@
+@import 'tailwindcss';
+
+/*
+ * Two disjoint colour families (wiki 04_ui_layout):
+ *   --color-accent-*  project identity — hue varies per project, ramp is fixed
+ *   --color-status-*  fixed meaning — identical in every project, never derived
+ * Set --project-hue per window; every accent token follows from that one number.
+ */
+:root {
+  color-scheme: light dark;
+  --project-hue: 210;
+  /*
+   * Identity is two numbers, so both need a default. Without this every
+   * `--color-accent-*` is `oklch(0.62 calc(0.16 * )` — invalid, and therefore
+   * *nothing*: the picker window, which never sets a project hue, lost its hue
+   * strip, its diamond and the accent on its one button ([[findings]]
+   * 2026-08-21). 1 is the full-chroma slot; only graphite drains it.
+   */
+  --project-chroma: 1;
+
+  /*
+   * **The terminal scheme** — one family, parameterised by the project hue.
+   *
+   * A tint was not enough: at 0.21 lightness the pane was a dark blob that
+   * happened to be slightly blue, and the reader asked for what an "ocean"
+   * terminal theme does — a *ground* that is unmistakably a colour, with a
+   * palette built to sit on it (reported in use, 2026-08-21). So the ground,
+   * the greys and the selection follow `--project-hue`, and only the six
+   * chromatic slots keep their standard hues: a program that prints "green"
+   * must print green, and an ANSI palette rotated by project identity would be
+   * a lie about its output ([[decisions]] 2026-08-21).
+   *
+   * Dark in **every** appearance — a TUI paints for a dark terminal — and
+   * OKLCH, because `Pane` converts these to a form `xterm` can parse rather
+   * than reading them raw. Slot 8, "bright black", is the one that decides
+   * whether an agent's dim text is readable at all: it is a *light* tint of the
+   * ground here, not a neutral grey.
+   */
+  --term-fg: oklch(0.98 calc(0.02 * var(--project-chroma)) var(--project-hue));
+  --term-cursor: oklch(0.95 calc(0.04 * var(--project-chroma)) var(--project-hue));
+  --term-selection: oklch(0.62 calc(0.13 * var(--project-chroma)) var(--project-hue));
+  --term-ansi-0: oklch(0.31 calc(0.09 * var(--project-chroma)) var(--project-hue));
+  --term-ansi-1: oklch(0.7 0.16 25);
+  --term-ansi-2: oklch(0.78 0.16 145);
+  --term-ansi-3: oklch(0.82 0.15 85);
+  --term-ansi-4: oklch(0.72 0.14 255);
+  --term-ansi-5: oklch(0.72 0.16 320);
+  --term-ansi-6: oklch(0.78 0.12 195);
+  --term-ansi-7: oklch(0.92 calc(0.02 * var(--project-chroma)) var(--project-hue));
+  --term-ansi-8: oklch(0.76 calc(0.06 * var(--project-chroma)) var(--project-hue));
+  --term-ansi-9: oklch(0.78 0.17 25);
+  --term-ansi-10: oklch(0.86 0.17 145);
+  --term-ansi-11: oklch(0.89 0.15 85);
+  --term-ansi-12: oklch(0.8 0.14 255);
+  --term-ansi-13: oklch(0.8 0.16 320);
+  --term-ansi-14: oklch(0.86 0.12 195);
+  --term-ansi-15: oklch(0.99 calc(0.01 * var(--project-chroma)) var(--project-hue));
+}
+
+@theme {
+  --color-accent: light-dark(oklch(0.62 calc(0.16 * var(--project-chroma)) var(--project-hue)), oklch(0.72 calc(0.15 * var(--project-chroma)) var(--project-hue)));
+  --color-accent-line: light-dark(oklch(0.85 calc(0.07 * var(--project-chroma)) var(--project-hue)), oklch(0.45 calc(0.08 * var(--project-chroma)) var(--project-hue)));
+  --color-accent-wash: light-dark(oklch(0.96 calc(0.03 * var(--project-chroma)) var(--project-hue)), oklch(0.28 calc(0.05 * var(--project-chroma)) var(--project-hue)));
+
+  --color-status-proposal: light-dark(oklch(0.68 0.14 70), oklch(0.78 0.13 70));
+  --color-status-over: light-dark(oklch(0.58 0.19 25), oklch(0.7 0.17 25));
+  --color-status-muted: light-dark(oklch(0.62 0.01 250), oklch(0.6 0.01 250));
+
+  /*
+   * The drawer's surfaces, in the same scheme as the palette above: the ground
+   * the terminal actually paints on, the darker lid above it, and the text on
+   * that lid. Strong on purpose — this is the colour the reader identifies the
+   * project by while the agent is running, and half the window is this object.
+   * Not `light-dark()`: dark in both appearances.
+   */
+  --color-term: oklch(0.45 calc(0.13 * var(--project-chroma)) var(--project-hue));
+  /** The tab strip: a darker lid, so the drawer reads as one object with a top. */
+  --color-term-chrome: oklch(0.37 calc(0.12 * var(--project-chroma)) var(--project-hue));
+  --color-term-line: oklch(0.6 calc(0.12 * var(--project-chroma)) var(--project-hue));
+  --color-term-text: oklch(0.98 calc(0.02 * var(--project-chroma)) var(--project-hue));
+  --color-term-muted: oklch(0.88 calc(0.05 * var(--project-chroma)) var(--project-hue));
+
+  /* A control's face: raised against the surface it sits on, in both schemes. */
+  --color-raised: light-dark(oklch(0.97 0.004 250), oklch(0.27 0.008 250));
+  --color-raised-hover: light-dark(oklch(0.93 0.006 250), oklch(0.32 0.01 250));
+
+  --color-surface: light-dark(oklch(0.99 0 0), oklch(0.19 0.005 250));
+  --color-text: light-dark(oklch(0.25 0.01 250), oklch(0.93 0.005 250));
+  --color-hairline: light-dark(oklch(0.89 0.004 250), oklch(0.32 0.008 250));
+
+  --font-ui: -apple-system, 'SF Pro Text', system-ui, sans-serif;
+
+  /*
+   * The type scale, as tokens rather than as `text-[11px]` sprayed through
+   * components — the drift [[contentions#C4]] names as its failure mode. Three
+   * sizes below the 13px UI default is the whole ladder the chrome needs.
+   */
+  --text-caption: 12px;
+  --text-label: 11px;
+  --text-dot: 10px;
+}
+
+body {
+  margin: 0;
+  background: transparent; /* the window's own vibrancy shows through */
+  color: var(--color-text);
+  font-family: var(--font-ui);
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+}
+
+/*
+ * **A control looks like a control.** Before this, an action and a read-only
+ * chip were both "hairline border, small text", so the reader had to guess
+ * which of them did anything — reported in use, 2026-08-21. A `.btn` therefore
+ * has a face, a border, a hover and a press, and the badges keep the flat
+ * outline they always had. The difference is deliberate: `Chip` is a fact,
+ * `.btn` is a verb.
+ */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
+  border: 1px solid var(--color-hairline);
+  border-radius: 6px;
+  background: var(--color-raised);
+  color: var(--color-text);
+  padding: 0.2rem 0.55rem;
+  font: inherit;
+  font-size: var(--text-label);
+  font-weight: 500;
+  line-height: 1.5;
+  /* One pixel of edge, not a drop shadow: the chrome is quiet (04_ui_layout). */
+  box-shadow: 0 1px 0 light-dark(oklch(0.87 0.005 250), oklch(0.16 0.006 250));
+}
+.btn:hover {
+  background: var(--color-raised-hover);
+}
+.btn:active {
+  /* Pressed rather than animated — the motion budget is drawer and pane only. */
+  box-shadow: none;
+  transform: translateY(1px);
+}
+.btn:disabled {
+  opacity: 0.4;
+  box-shadow: none;
+}
+/** The one action a view is *for*: save, edit, append, open. */
+.btn-accent {
+  border-color: var(--color-accent-line);
+  background: var(--color-accent-wash);
+  color: var(--color-accent);
+  font-weight: 600;
+}
+.btn-accent:hover {
+  border-color: var(--color-accent);
+}
+/** Overwriting someone else's change is not a neutral verb. */
+.btn-danger {
+  border-color: var(--color-status-over);
+  color: var(--color-status-over);
+}
+/** Icon-only: square, and never without an `aria-label`. */
+.btn-icon {
+  padding: 0.2rem 0.35rem;
+}
+/**
+ * The same control on the drawer's dark chrome. Its own face because the
+ * window's `--color-raised` is a light-scheme colour and the drawer is dark in
+ * both appearances.
+ */
+.btn-term {
+  border-color: var(--color-term-line);
+  background: color-mix(in oklab, var(--color-term-chrome) 82%, white);
+  color: var(--color-term-text);
+  box-shadow: none;
+}
+.btn-term:hover {
+  background: color-mix(in oklab, var(--color-term-chrome) 68%, white);
+}
+
+/* Everything above the content is draggable except actual controls. */
+.drag {
+  -webkit-app-region: drag;
+}
+.no-drag {
+  -webkit-app-region: no-drag;
+}
+
+/*
+ * Rendered markdown. The prose column is capped at 72ch and set at 14px against
+ * the 13px UI (wiki 04_ui_layout, visual language). Everything here styles what
+ * `core.renderHtml` emits — the app has no other source of markup.
+ */
+.prose {
+  max-width: 72ch;
+  font-size: 14px;
+  line-height: 1.65;
+}
+/*
+ * One level down from the source, because `core.renderHtml` demotes every
+ * heading: the view's `h1` is the file path, so `# Title` arrives as an `h2`
+ * (wiki 04_ui_layout, one `h1` per view). The sizes therefore shift with it —
+ * an `h2` is the note's title, not a section.
+ */
+.prose h2,
+.prose h3,
+.prose h4,
+.prose h5 {
+  font-weight: 600;
+  line-height: 1.25;
+  margin: 1.6em 0 0.5em;
+}
+.prose h2 {
+  font-size: 1.6em;
+}
+.prose h3 {
+  font-size: 1.3em;
+}
+.prose h4 {
+  font-size: 1.1em;
+}
+/* Whatever opens the note opens flush; only a *later* heading gets the gap. */
+.prose > :first-child {
+  margin-top: 0;
+}
+.prose p,
+.prose ul,
+.prose ol,
+.prose blockquote,
+.prose pre {
+  margin: 0.75em 0;
+}
+.prose ul,
+.prose ol {
+  padding-left: 1.4em;
+}
+.prose ul {
+  list-style: disc;
+}
+.prose ol {
+  list-style: decimal;
+}
+.prose li {
+  margin: 0.2em 0;
+}
+.prose blockquote {
+  border-left: 2px solid var(--color-accent-line);
+  padding-left: 0.9em;
+  color: var(--color-status-muted);
+}
+.prose code {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 0.88em;
+  background: var(--color-accent-wash);
+  border-radius: 4px;
+  padding: 0.1em 0.3em;
+}
+.prose pre {
+  background: var(--color-accent-wash);
+  border-radius: 8px;
+  padding: 0.8em 1em;
+  overflow-x: auto;
+}
+.prose pre code {
+  background: none;
+  padding: 0;
+}
+.prose hr {
+  border: none;
+  border-top: 1px solid var(--color-hairline);
+  margin: 1.6em 0;
+}
+.prose a {
+  color: var(--color-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+/* Tables are how the schema writes itself — register indexes, budget rows. */
+.prose table {
+  border-collapse: collapse;
+  margin: 0.9em 0;
+  display: block;
+  overflow-x: auto;
+}
+.prose th,
+.prose td {
+  border: 1px solid var(--color-hairline);
+  padding: 0.3em 0.6em;
+  text-align: left;
+  vertical-align: top;
+}
+.prose th {
+  font-weight: 600;
+  background: var(--color-accent-wash);
+}
+.prose input[type='checkbox'] {
+  margin-right: 0.4em;
+}
+
+/*
+ * The two `[[link]]` states, and they are different *elements*: a resolved link
+ * is an anchor and a dangling one is a span, so it cannot be clicked or focused
+ * (wiki 04_ui_layout — a dangling link is a to-do, not an error).
+ */
+.prose a.wikilink {
+  text-decoration-style: solid;
+}
+.prose .wikilink-broken {
+  color: var(--color-status-over);
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+  cursor: help;
+}
+
+/*
+ * A palette swatch paints one hue of the identity ramp. The colour is expressed
+ * here, over a `--swatch-hue` the component sets, so no component carries a
+ * colour value of its own ([[contentions#C4]]).
+ */
+/*
+ * A text field. The app had none until settings arrived — every other input is
+ * a button or the editor — so this is the whole of it: the `.btn` face turned
+ * inward, and an accent ring on focus rather than the platform's blue, which
+ * would be the one control in the window wearing a colour from outside the two
+ * families ([[decisions]] 2026-08-21).
+ */
+.field {
+  border: 1px solid var(--color-hairline);
+  border-radius: 6px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  padding: 0.2rem 0.5rem;
+  font: inherit;
+  font-size: var(--text-label);
+  line-height: 1.5;
+}
+/*
+ * The one native control the app has. `accent-color` is what keeps its check
+ * mark in the project's colour rather than the platform blue — the only colour
+ * in the window that would come from neither family ([[contentions#C4]]).
+ */
+input[type='radio'],
+input[type='checkbox'] {
+  accent-color: var(--color-accent);
+}
+
+.field:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: -1px;
+}
+
+/*
+ * A picker row: the whole width is the hit target, and it is a surface rather
+ * than a link, because "open this project" is a verb like the `.btn` verbs and
+ * an underlined path is a place to *aim* rather than a thing to press
+ * ([[decisions]] 2026-08-21).
+ */
+.project-row {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  width: 100%;
+  border: 1px solid var(--color-hairline);
+  border-radius: 8px;
+  background: var(--color-raised);
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+}
+.project-row:hover {
+  border-color: var(--color-accent-line);
+  background: var(--color-raised-hover);
+}
+.project-row:active {
+  transform: translateY(1px);
+}
+
+/*
+ * The identity diamond of a project that is *not* this window's — a picker row.
+ * Same ramp as `.swatch` and as `--color-accent`, over a `--swatch-hue` the row
+ * sets, because a project has one colour wherever it is named
+ * ([[contentions#C4]]).
+ */
+.mark {
+  background: oklch(0.62 calc(0.16 * var(--swatch-chroma, 1)) var(--swatch-hue));
+  width: 0.5rem;
+  height: 0.5rem;
+  rotate: 45deg;
+}
+
+.swatch {
+  /* The same ramp the window gets, including the graphite slot's drained
+     chroma — a swatch that lied about its hue would be the one control here
+     that cannot be trusted. */
+  background: oklch(0.62 calc(0.16 * var(--swatch-chroma, 1)) var(--swatch-hue));
+  border-radius: 9999px;
+  width: 0.85rem;
+  height: 0.85rem;
+}
+
+/*
+ * The modal sheet (⌘⇧O, ⌘K). `<dialog>` in the top layer needs no z-index and
+ * brings its own backdrop; all that is left is where it sits and how far in
+ * from the window edge (wiki 04_ui_layout, visual language).
+ */
+/*
+ * `display` on a `<dialog>` is a trap: an author rule beats the UA's
+ * `dialog:not([open]) { display: none }` at any specificity, so a closed sheet
+ * lays itself out in normal flow — the ⌘K palette and the picker, visible and
+ * tabbable, in every window (M3b bug hunt).
+ */
+.sheet:not([open]) {
+  display: none;
+}
+.sheet[open] {
+  margin: 0 auto;
+  margin-top: 12vh;
+  width: min(42rem, 90vw);
+  /* The sheet is a column so its *list* scrolls rather than its own box: a
+     dialog that overflows clips the last row against a hard edge. */
+  display: flex;
+  flex-direction: column;
+  max-height: 70vh;
+  padding: 0;
+  border: 1px solid var(--color-hairline);
+  border-radius: 8px;
+  background: var(--color-surface);
+  color: var(--color-text);
+  box-shadow: 0 12px 40px light-dark(oklch(0 0 0 / 0.18), oklch(0 0 0 / 0.5));
+}
+.sheet::backdrop {
+  background: light-dark(oklch(0.4 0 0 / 0.25), oklch(0 0 0 / 0.45));
+}
+.sheet-body {
+  display: flex;
+  min-height: 0;
+  flex-direction: column;
+  padding: 1rem;
+}
+
+/*
+ * `xterm` paints its viewport with the *opaque* form of the theme background,
+ * so a transparent theme still punches a black rectangle through the window
+ * (M4 browser check). It stays transparent — but the surface showing through is
+ * now the pane's own `--color-term`, not the window's vibrancy, because the
+ * program inside the pane assumes a dark terminal (see the palette above).
+ */
+.xterm .xterm-viewport {
+  background-color: transparent;
+}
+
+/*
+ * …and its scrollbar with it. The viewport keeps a 15px gutter whatever the
+ * scrollback holds, and an unstyled one is painted by the platform in *light*
+ * — a pale strip down the right-hand edge of a dark pane, which a pane the size
+ * of the window makes impossible to miss (browser check, 2026-08-24).
+ */
+.xterm .xterm-viewport::-webkit-scrollbar {
+  width: 10px;
+}
+.xterm .xterm-viewport::-webkit-scrollbar-track {
+  background: transparent;
+}
+.xterm .xterm-viewport::-webkit-scrollbar-thumb {
+  border-radius: 5px;
+  background: var(--color-term-line);
+}
