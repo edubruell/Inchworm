@@ -115,6 +115,12 @@ describe('starting a pane', () => {
   })
 
   test('a window may hold only so many panes', () => {
+    // The number, not only the behaviour. Every other assertion here — and the
+    // renderer's fixture, which holds its own literal — is written against
+    // `MAX_PANES`, so raising the cap used to leave the whole suite green while
+    // `budgets.md` still declared 4 (found by the first lint, 2026-09-08).
+    expect(MAX_PANES).toBe(4)
+
     const app = harness()
     for (let pane = 0; pane < MAX_PANES; pane += 1) app.host.start(1, '/p', START)
 

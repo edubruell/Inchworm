@@ -65,7 +65,7 @@ export default defineConfig({
         // The three modules that only exist inside a running Electron app: the
         // composition root, window creation, and the contextBridge call. Named
         // here rather than left at 0 %, so the exclusion is a decision someone
-        // made (wiki 02_architecture, `enforced-by`).
+        // made rather than a gap nobody noticed (wiki 02_architecture).
         'src/main/index.ts',
         'src/main/window.ts',
         'src/preload/index.ts',

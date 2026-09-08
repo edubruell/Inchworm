@@ -6,7 +6,7 @@
  * `main/skill.ts` is the disk; this file is the shape.
  *
  * Two write scopes, both named here and nothing else: the skill directory and
- * the three SessionStart hook scripts. `~/.claude/settings.json` is deliberately
+ * the four SessionStart hook scripts. `~/.claude/settings.json` is deliberately
  * absent — `install.sh` does not edit it either, and a wiring line the app
  * guessed wrong would break every project on the machine.
  */

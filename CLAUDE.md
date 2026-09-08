@@ -34,8 +34,9 @@ inside a module (wiki `07_platform_ports`).
 - **The renderer never touches the filesystem**, and never names its project:
   fs, git and PTY live in main behind a zod-validated, allow-listed IPC surface
   scoped by the *sending window*. `contextIsolation`, `sandbox`, no
-  `nodeIntegration`. Reads and writes reach the wiki root, the journal and
-  CLAUDE.md — never the rest of the repository.
+  `nodeIntegration`. Reads and writes reach the wiki root, the journal and the
+  agent file — `CLAUDE.md` **or** `AGENTS.md` (`core/schema.ts:AGENT_FILES`) —
+  never the rest of the repository.
 - **`src/core` is pure** — no DOM, no node builtins, no I/O. All llmwiki schema
   knowledge lives there; no component may regex a filename. A rule about the
   schema lands in `core` with its tests before any component shows it.
