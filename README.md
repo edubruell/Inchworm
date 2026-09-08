@@ -39,7 +39,9 @@ apart at a glance.
 
 ## Requirements
 
-Built and tested on **macOS, Apple silicon (arm64)**. 
+Built and tested on **macOS, Apple silicon (arm64)**. **Windows** and **Linux**
+are medium-term goals: the terminal, the window chrome and the packaging all
+need work first, so today it is macOS only.
 
 ## Running it from source
 
