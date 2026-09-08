@@ -15,6 +15,13 @@ jobs:
         with:
           node-version: 24
           cache: npm
+      # npm is pinned, not inherited. `node-version: 24` floats to the latest
+      # 24.x, and its bundled npm floats with it — 11.6.2 and 11.19.0 key
+      # nested optional platform packages differently, so a lockfile written by
+      # one is rejected by the other with EUSAGE and the job dies before the
+      # first gate. Bumping this pin and re-running `npm install
+      # --package-lock-only` are one commit, never two.
+      - run: npm i -g npm@11.19.0
       - run: npm ci
       - run: npm run lint
       - run: npm run typecheck
