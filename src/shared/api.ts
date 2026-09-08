@@ -98,10 +98,27 @@ export type InstallSkillInput = { readonly baseSha: string }
 export const PRESETS = ['agent', 'shell'] as const
 export type Preset = (typeof PRESETS)[number]
 
+/**
+ * Which of a window's two folders a pane is asked for. A window showing the
+ * bootstrap panel has both: the project it is bound to, and the folder it just
+ * refused to open — and the panel means the second one. The renderer names the
+ * *scope*, never the directory; main still resolves both.
+ */
+export const PTY_SCOPES = ['project', 'pending'] as const
+export type PtyScope = (typeof PTY_SCOPES)[number]
+
 export type StartPtyInput = {
   readonly preset: Preset
   readonly cols: number
   readonly rows: number
+  /**
+   * Which folder to run in. Absent means `project`, which is the drawer: the
+   * window's own project, falling back to a pending folder in a window that has
+   * no project. `pending` is the bootstrap panel, and it is the only way to
+   * reach the refused folder from a window that *does* have a project — the
+   * picker sheet can be opened over one.
+   */
+  readonly scope?: PtyScope | undefined
   /**
    * Which agent, for the `agent` preset. An **id from settings**, never a
    * command: main looks it up and builds the argv, so the rule that nothing the
@@ -397,8 +414,8 @@ export type WikiApi = {
    */
   readonly openExternal: (url: string) => Promise<void>
   /**
-   * Opens a pane in this window's project directory — or, in a window with no
-   * project, in the folder this window last tried and failed to open, which is
+   * Opens a pane in this window's project directory — or, under the `pending`
+   * scope, in the folder this window last tried and failed to open, which is
    * how the bootstrap sheet runs an agent where the wiki is about to be. Both
    * directories are main's: the renderer names neither.
    */

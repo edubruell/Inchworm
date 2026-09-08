@@ -547,6 +547,27 @@ describe('the projects sheet, used', () => {
     expect(sheets()).toBe(1)
     expect(sheet()?.querySelector('[role="alert"]')?.textContent).toContain('No llmwiki project')
   })
+
+  /**
+   * The bootstrap panel over a window that already has a project. The window
+   * has two folders then — its own and the one just refused — and the agent
+   * belongs in the second: a pane started in the project the reader is not
+   * pointing at reads *that* project's wiki and looks like the app opened the
+   * wrong one.
+   */
+  test('the agent it offers is scoped to the refused folder, not to the window project', async () => {
+    const fake = await mount({ recent: RECENT, refuseOpen: { kind: 'no-llmwiki', dir: '/nope', markers: { agentFiles: [], wiki: false } } })
+    await fire(fake, { kind: 'projects' })
+    await click(sheet()?.querySelector('ul button'))
+
+    const start = [...(sheet()?.querySelectorAll('button') ?? [])].find((button) =>
+      button.textContent.includes('Start'),
+    )
+    await click(start)
+
+    expect(fake.started).toEqual(['agent'])
+    expect(fake.scopes).toEqual(['pending'])
+  })
 })
 
 describe('a window with no project', () => {

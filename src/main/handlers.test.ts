@@ -441,13 +441,50 @@ describe('the folder that is not a project yet', () => {
     })
   })
 
-  test('a window bound to a project ignores any pending folder — the project wins', async () => {
+  test('the drawer of a window bound to a project ignores any pending folder — the project wins', async () => {
     const app = harness()
 
     await app.call(CHANNEL.openProject, { dir: bare })
     await app.call(CHANNEL.startPty, { preset: 'agent', cols: 80, rows: 24 })
 
     expect(app.spawns.at(-1)?.cwd).toBe(sample.dir)
+  })
+
+  /**
+   * The picker is mounted twice: as the window with no project, and as a sheet
+   * over one that has a project. The bootstrap panel is the same component in
+   * both, and in the second the window has *both* folders — so the panel names
+   * the scope, or the agent runs in the project the reader is not pointing at
+   * and reads its wiki instead.
+   */
+  test('the bootstrap panel runs in the refused folder even in a window that has a project', async () => {
+    const app = harness()
+
+    await app.call(CHANNEL.openProject, { dir: bare })
+    const started = await app.call(CHANNEL.startPty, { preset: 'agent', cols: 80, rows: 24, scope: 'pending' })
+
+    expect(started).toMatchObject({ ok: true })
+    expect(app.spawns.at(-1)?.cwd).toBe(bare)
+  })
+
+  test('the pending scope never falls back to the project', async () => {
+    const app = harness()
+
+    expect(await app.call(CHANNEL.startPty, { preset: 'agent', cols: 80, rows: 24, scope: 'pending' })).toEqual({
+      ok: false,
+      error: { kind: 'no-project' },
+    })
+    expect(app.spawns).toHaveLength(0)
+  })
+
+  test('a scope that names neither folder is refused before anything is spawned', async () => {
+    const app = harness()
+
+    expect(await app.call(CHANNEL.startPty, { preset: 'agent', cols: 80, rows: 24, scope: 'elsewhere' })).toEqual({
+      ok: false,
+      error: { kind: 'bad-request' },
+    })
+    expect(app.spawns).toHaveLength(0)
   })
 })
 

@@ -27,10 +27,13 @@ export type Registry = {
   readonly detach: (windowId: number) => void
   readonly projectFor: (windowId: number) => OpenProject | undefined
   /**
-   * The folder a project-less window last tried and failed to open. It is kept
-   * here rather than in the renderer because the renderer must never name a
-   * directory: the bootstrap sheet says "start an agent", and *this* is the
-   * folder main starts it in. One per window, and it goes when the window does.
+   * The folder a window last tried and failed to open. It is kept here rather
+   * than in the renderer because the renderer must never name a directory: the
+   * bootstrap sheet says "start an agent" under the `pending` scope, and *this*
+   * is the folder main starts it in. Any window can have one — the picker sheet
+   * opens over a window that already has a project — so it is a second folder
+   * beside the project, never a substitute for one. One per window, and it goes
+   * when the window does.
    */
   readonly rememberPending: (windowId: number, dir: string) => void
   readonly pendingFor: (windowId: number) => string | undefined

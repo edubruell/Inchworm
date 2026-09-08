@@ -27,7 +27,7 @@ import type {
   WriteFileInput,
   WritePtyInput,
 } from './api.js'
-import { MAX_FILE_BYTES, PRESETS } from './api.js'
+import { MAX_FILE_BYTES, PRESETS, PTY_SCOPES } from './api.js'
 
 /**
  * A project-relative path, refused before it reaches the filesystem: no
@@ -106,6 +106,9 @@ export const startPtyInput: z.ZodType<StartPtyInput> = z.object({
   // it against the stored launchers; an id that names nothing gets the default
   // rather than an error, so a stale menu cannot fail a spawn.
   launcherId: z.string().min(1).max(64).optional(),
+  // Which of the window's folders, not which folder: the two are main's, and an
+  // absent scope is the drawer's `project`.
+  scope: z.enum(PTY_SCOPES).optional(),
 })
 
 const ptyId = z.number().int().min(1)

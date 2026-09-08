@@ -191,8 +191,14 @@ export const registerHandlers = (ipc: IpcHandleLike, deps: HandlerDeps): void =>
     const id = deps.windowIdOf(event)
     if (id === undefined) return err({ kind: 'no-project' })
     // A window with no project may still have a folder it just failed to open:
-    // that is the bootstrap sheet, running an agent where the wiki will be.
-    const cwd = deps.registry.projectFor(id)?.dir ?? deps.registry.pendingFor(id)
+    // that is the bootstrap sheet, running an agent where the wiki will be. The
+    // sheet can be opened over an *open* project, and then the window has both
+    // — so the panel asks for `pending` by name rather than being outranked by
+    // the project the reader is not pointing at.
+    const cwd =
+      input.data.scope === 'pending'
+        ? deps.registry.pendingFor(id)
+        : (deps.registry.projectFor(id)?.dir ?? deps.registry.pendingFor(id))
     if (cwd === undefined) return err({ kind: 'no-project' })
     // The id names a row in settings; the *command* is looked up here, so
     // nothing the renderer sent becomes an argv.

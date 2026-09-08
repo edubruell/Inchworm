@@ -317,7 +317,7 @@ describe('a folder with no llmwiki in it', () => {
   test('says what is missing, by name, rather than "not a project"', async () => {
     await openRefused()
 
-    const panel = document.querySelector('[aria-label="Not an llmwiki project"]')
+    const panel = document.querySelector('[aria-label="Not an llmwiki project: newthing"]')
     expect(panel?.textContent).toContain('CLAUDE.md')
     expect(panel?.textContent).toContain('AGENTS.md')
     expect(panel?.textContent).toContain('local_context/wiki')
@@ -334,7 +334,9 @@ describe('a folder with no llmwiki in it', () => {
   test('offers the default agent, and starting it opens a pane in that folder', async () => {
     const fake = await openRefused()
 
-    await click(button('Start claude here'))
+    // The folder by name, not "here": the same panel is mounted in the picker
+    // sheet over an open project, where "here" reads as that project.
+    await click(button('Start claude in newthing'))
 
     // The renderer named an agent; the folder is the one main just refused,
     // which is why no directory crosses the bridge here.
@@ -352,14 +354,14 @@ describe('a folder with no llmwiki in it', () => {
     })
     await click(document.querySelector('.project-row'))
 
-    expect(button('Start codex here')).not.toBeUndefined()
-    await click(button('Start codex here'))
+    expect(button('Start codex in newthing')).not.toBeUndefined()
+    await click(button('Start codex in newthing'))
     expect(fake.launched).toEqual(['codex'])
   })
 
   test('the agent takes the window rather than a strip inside the panel', async () => {
     await openRefused()
-    await click(button('Start claude here'))
+    await click(button('Start claude in newthing'))
 
     // A conversation with an agent needs the window: the pane is the window's,
     // not the panel's, and it carries its own way back.
@@ -367,20 +369,20 @@ describe('a folder with no llmwiki in it', () => {
     expect(pane).not.toBeNull()
     expect(pane?.className).toContain('fixed')
     expect(pane?.querySelector('.xterm')).not.toBeNull()
-    expect(pane?.textContent).toContain('Check again')
+    expect(pane?.textContent).toContain('Check newthing again')
     // Below the title bar, so the traffic lights and the drag region survive.
     expect(pane?.className).toContain('top-12')
   })
 
   test('closing the pane gives the folder panel back, and kills the pty', async () => {
     const fake = await openRefused()
-    await click(button('Start claude here'))
+    await click(button('Start claude in newthing'))
     expect(fake.livePanes()).toBe(1)
 
     await click(button('Close'))
 
     expect(document.querySelector('[aria-label="claude in /Users/e/git/newthing"]')).toBeNull()
-    expect(button('Start claude here')).not.toBeUndefined()
+    expect(button('Start claude in newthing')).not.toBeUndefined()
     expect(fake.livePanes()).toBe(0)
   })
 
@@ -388,9 +390,22 @@ describe('a folder with no llmwiki in it', () => {
     const fake = await openRefused()
     expect(fake.opened).toEqual(['/Users/e/git/newthing'])
 
-    await click(button('Check again'))
+    await click(button('Check newthing again'))
 
     expect(fake.opened).toEqual(['/Users/e/git/newthing', '/Users/e/git/newthing'])
+  })
+
+  /**
+   * The panel's premise, said out loud: opening never re-points the window it
+   * is drawn in — main makes a new one for every open ([[02_architecture]]) —
+   * and from the sheet that window is somebody else's project.
+   */
+  test('says that a folder which passes opens in a window of its own', async () => {
+    await openRefused()
+
+    const panel = document.querySelector('[aria-label="Not an llmwiki project: newthing"]')
+    expect(panel?.textContent).toContain('opens in a window of its own')
+    expect(panel?.textContent).toContain('this window stays where it is')
   })
 })
 

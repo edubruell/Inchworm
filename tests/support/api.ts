@@ -52,6 +52,12 @@ export type FakeApi = {
   readonly started: readonly string[]
   /** The launcher id each `agent` pane named; `undefined` means "the default". */
   readonly launched: readonly (string | undefined)[]
+  /**
+   * Which of the window's folders each pane asked for; `undefined` means "the
+   * default", which is the drawer's project. The bootstrap panel must say
+   * `pending` — it is also mounted over a window that has a project.
+   */
+  readonly scopes: readonly (string | undefined)[]
   /** Settings the sheet saved, in order. */
   readonly saved: readonly Settings[]
   /** The guard digest each install carried, in order — a stale one is assertable. */
@@ -118,6 +124,7 @@ export const fakeApi = (options: {
   const typed: string[] = []
   const started: string[] = []
   const launched: (string | undefined)[] = []
+  const scopes: (string | undefined)[] = []
   const saved: Settings[] = []
   const installs: string[] = []
   let debtReads = 0
@@ -140,6 +147,7 @@ export const fakeApi = (options: {
     typed,
     started,
     launched,
+    scopes,
     saved,
     settingsChanged: (next): void => {
       settings = next
@@ -223,6 +231,7 @@ export const fakeApi = (options: {
         if (live.size >= (options.paneCap ?? 4)) return Promise.resolve({ ok: false, error: { kind: 'too-many' } })
         started.push(input.preset)
         launched.push(input.launcherId)
+        scopes.push(input.scope)
         live.add(started.length)
         return Promise.resolve({ ok: true, value: { id: started.length } })
       },

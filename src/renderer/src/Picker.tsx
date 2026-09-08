@@ -18,7 +18,7 @@ import {
 // app already ships.
 import mascot from './assets/mascot.png?inline'
 import { chromaFor } from '@core/hue.js'
-import { parentDir } from '@core/paths.js'
+import { basename, parentDir } from '@core/paths.js'
 import { launcherFor } from '@core/settings.js'
 import { AGENT_FILES, CONVENTIONAL_WIKI_ROOT } from '@core/schema.js'
 import { sinceLabel } from '@core/time.js'
@@ -48,8 +48,19 @@ const Bootstrap = (props: {
   /** Try the folder again — the agent may have written the block by now. */
   readonly onRetry: () => void
 }): JSX.Element => {
-  const terminals = createTerminals(props.api)
+  // `pending`, not the window's project: this panel is also mounted in the
+  // picker *sheet*, over a window that already has one, and the folder it is
+  // about is the one main just refused.
+  const terminals = createTerminals(props.api, 'pending')
   const launcher = (): string => launcherFor(props.settings, undefined)?.label ?? 'an agent'
+  /**
+   * The folder, by its own name. This panel is also mounted in the picker sheet
+   * over a window that already has a project, and "here" then reads as *this
+   * window* — which is the project the agent is not running in. Naming the
+   * folder is what makes the two distinguishable at a glance; the path itself
+   * is directly above, and main is still the only side that knows it.
+   */
+  const folder = (): string => basename(props.error.dir)
 
   const found = (name: string): boolean => props.error.markers.agentFiles.includes(name)
 
@@ -83,7 +94,7 @@ const Bootstrap = (props: {
       <section
         class="flex flex-col gap-3 rounded border border-status-proposal/60 bg-status-proposal/5 p-4"
         classList={{ hidden: running() }}
-        aria-label="Not an llmwiki project"
+        aria-label={`Not an llmwiki project: ${folder()}`}
       >
         <div class="flex items-start gap-2">
           <span class="mt-0.5 shrink-0 text-status-proposal">
@@ -121,7 +132,9 @@ const Bootstrap = (props: {
 
         <p class="text-sm text-status-muted">
           {markerAdvice(props.error)} The app never writes the schema itself. Run{' '}
-          <code>/llmwiki init</code> in the agent this opens, then check again.
+          <code>/llmwiki init</code> in the agent this opens, then check again — once the block is
+          there, <span class="font-medium">{folder()}</span> opens in a window of its own, and this
+          window stays where it is.
         </p>
 
         {/* No "running here" state to draw: while the agent is up it *is* the
@@ -134,11 +147,11 @@ const Bootstrap = (props: {
             }}
           >
             <Icon name="terminal" />
-            Start {launcher()} here
+            Start {launcher()} in {folder()}
           </button>
           <button class="btn no-drag" onClick={props.onRetry}>
             <Icon name="revert" />
-            Check again
+            Check {folder()} again
           </button>
         </div>
 
@@ -186,7 +199,7 @@ const Bootstrap = (props: {
               <span class="flex-1" />
               <button class="btn btn-term no-drag" onClick={props.onRetry}>
                 <Icon name="revert" />
-                Check again
+                Check {folder()} again
               </button>
               <button
                 class="btn btn-term no-drag"

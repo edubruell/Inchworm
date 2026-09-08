@@ -12,7 +12,7 @@
  */
 
 import { createSignal, onCleanup } from 'solid-js'
-import type { Launcher, Preset, PtyEvent, WikiApi } from '@shared/api.js'
+import type { Launcher, Preset, PtyEvent, PtyScope, WikiApi } from '@shared/api.js'
 import { dropText } from '@core/shell.js'
 import { ptyMessage } from './messages.js'
 import { presetLabel } from './signals.js'
@@ -52,7 +52,14 @@ export type Terminals = {
   readonly drop: (id: number, files: readonly File[]) => void
 }
 
-export const createTerminals = (api: WikiApi): Terminals => {
+/**
+ * The window's panes. `scope` says which of the window's folders they run in
+ * and belongs to the *mount*, not to a call: the drawer is always the project,
+ * the bootstrap panel is always the folder that was refused. A window can show
+ * both at once — the picker sheet opens over an open project — which is why the
+ * panel cannot simply be "the window with no project".
+ */
+export const createTerminals = (api: WikiApi, scope: PtyScope = 'project'): Terminals => {
   const [panes, setPanes] = createSignal<readonly Pane[]>([])
   const [active, setActive] = createSignal<number>()
   const [failure, setFailure] = createSignal<string>()
@@ -96,7 +103,7 @@ export const createTerminals = (api: WikiApi): Terminals => {
     start: (preset, cols, rows, launcher): void => {
       setFailure(undefined)
       api
-        .startPty({ preset, cols, rows, launcherId: launcher?.id })
+        .startPty({ preset, cols, rows, launcherId: launcher?.id, scope })
         .then((result) => {
           if (!result.ok) {
             setFailure(ptyMessage(result.error))
