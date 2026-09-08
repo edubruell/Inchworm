@@ -47,24 +47,8 @@ export const watchProject: WatchProject = (project, notify) => {
     console.error('[Inchworm] watcher', error)
   })
 
-  /**
-   * The listener goes *synchronously*; the watcher closes when it closes.
-   * `close()` is a promise, so a stop is otherwise a request rather than an
-   * effect, and chokidar can still deliver between the call and the close
-   * landing — whether it does depends on how fast the platform's event source
-   * is. fsevents wins that race almost always; the macOS CI runner did not
-   * (2026-09-08), and neither inotify nor ReadDirectoryChangesW is under any
-   * obligation to. Dropping the `all` listener costs nothing and makes the
-   * silence the caller was promised true immediately.
-   *
-   * Only `all`: `error` stays, because an EventEmitter with no error listener
-   * *throws* on one, and chokidar may report during a close. Removing every
-   * listener would turn a vanished directory into an uncaught exception in
-   * main, which is precisely what the handler above exists to prevent.
-   */
   return (): void => {
     if (pending !== undefined) clearTimeout(pending)
-    watcher.removeAllListeners('all')
     watcher.close().catch((error: unknown) => {
       console.error('[Inchworm] watcher close', error)
     })

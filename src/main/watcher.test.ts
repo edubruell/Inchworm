@@ -114,6 +114,22 @@ describe('watchProject', () => {
     expect(seen).toContainEqual({ kind: 'file', path: 'wiki/00_state.md' })
   })
 
+  /**
+   * The claim is about what arrives *after* `stop()`, so what arrived before it
+   * is dropped rather than asserted about — and it has to be, because the
+   * fixture writes `wiki/00_state.md` immediately before the watch begins. On a
+   * filesystem slower than this machine's the notification for that write lands
+   * after the watcher is up, as a `change`: the initial scan already saw the
+   * file, so `ignoreInitial` swallowed its `add` and left the write itself to
+   * be reported. Every other test here says `toContainEqual` and never notices
+   * the extra event; this is the only one that asserts emptiness, and it is the
+   * only one CI failed (2026-09-08).
+   *
+   * Note what this test therefore does *not* prove: chokidar's `close()` sets
+   * `closed` and drops every listener synchronously, so a stop is already an
+   * effect rather than a request, and no guard in `watcher.ts` is what makes
+   * this pass.
+   */
   test('nothing is reported after the watcher is stopped', async () => {
     const open = await project()
     const seen: WatchChange[] = []
@@ -121,6 +137,7 @@ describe('watchProject', () => {
       seen.push(change)
     })
     await settle(300)
+    seen.splice(0)
     stop()
 
     await writeFile(join(open.dir, 'wiki/00_state.md'), 'edited\n', 'utf8')
