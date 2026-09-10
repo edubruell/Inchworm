@@ -38,18 +38,23 @@ const attachDiagnostics = (window: BrowserWindow): void => {
   })
 
   /**
-   * The renderer vetoed the close because it is holding unsaved drafts. Chromium
-   * ignores `beforeunload` in a desktop app unless the host asks; this is the
-   * ask, and the reader gets the choice rather than losing the bytes silently.
+   * The renderer vetoed the close because it is holding something a close would
+   * destroy — unsaved drafts, or a running agent. Chromium ignores
+   * `beforeunload` in a desktop app unless the host asks; this is the ask, and
+   * the reader gets the choice rather than losing the work silently.
+   *
+   * The wording names both, because only the renderer knows which it is and it
+   * says so with a veto and nothing else. A message written for one of the two
+   * is a message that lies in the other window.
    */
   window.webContents.on('will-prevent-unload', (event) => {
     const choice = dialog.showMessageBoxSync(window, {
       type: 'warning',
-      buttons: ['Cancel', 'Close without saving'],
+      buttons: ['Cancel', 'Close anyway'],
       defaultId: 0,
       cancelId: 0,
-      message: 'This window has unsaved changes.',
-      detail: 'Closing it now throws away every draft it is holding.',
+      message: 'Closing this window loses what is in it.',
+      detail: 'Every unsaved draft is thrown away, and anything running in a terminal here is stopped.',
     })
     if (choice === 1) event.preventDefault()
   })

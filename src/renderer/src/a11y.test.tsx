@@ -106,6 +106,12 @@ describe('one h1 per view', () => {
     expect(headings()).toEqual(['Open a project'])
   })
 
+  test('the agent window: a folder with a terminal in it is a view too', async () => {
+    await mount(fakeApi({ project: undefined, pending: { dir: '/Users/e/git/newthing' } }).api)
+
+    expect(headings()).toEqual(['claude in newthing'])
+  })
+
   test('no bridge: a failure state carries its own heading', async () => {
     await mount(undefined)
 

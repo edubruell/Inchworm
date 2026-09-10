@@ -18,6 +18,7 @@ import type {
   FileError,
   FileStamp,
   OpenProjectError,
+  PendingSnapshot,
   ProjectEvent,
   ProjectSnapshot,
   ProjectSummary,
@@ -71,6 +72,14 @@ export type HandlerDeps = {
   readonly windowIdOf: (event: IpcEventLike) => number | undefined
   readonly chooseDirectory: () => Promise<string | undefined>
   readonly openWindow: (project: OpenProject) => void
+  /**
+   * A window on a folder that is *not* a project yet: the terminal-only agent
+   * window the bootstrap panel sends the reader into. It takes the folder main
+   * refused, and binds the new window to it as its pending folder.
+   */
+  readonly openAgentWindow: (dir: string) => void
+  /** Brings an existing window to the front — the answer to "open this twice". */
+  readonly focusWindow: (windowId: number) => void
   readonly broadcast: (dir: string, event: ProjectEvent) => void
   /** Hands a vetted `http(s)` URL to the OS. */
   readonly openExternal: (url: string) => Promise<void>
@@ -129,8 +138,15 @@ export const registerHandlers = (ipc: IpcHandleLike, deps: HandlerDeps): void =>
       // A refusal is not the end of the story: the picker offers to start an
       // agent in that folder, and this is where main learns which folder that
       // is — from its own `loadProject` call, never from the renderer.
+      // Only the refusal that has somewhere to go. A folder main rejected for
+      // any *other* reason — it is not a directory at all — must not become a
+      // place this app will later run an agent: the renderer chose that path,
+      // and `no-llmwiki` is the one kind that means "a real folder, waiting for
+      // its wiki".
       const id = deps.windowIdOf(event)
-      if (id !== undefined) deps.registry.rememberPending(id, input.data.dir)
+      if (id !== undefined && project.error.kind === 'no-llmwiki') {
+        deps.registry.rememberRefusal(id, input.data.dir)
+      }
       return project
     }
 
@@ -139,6 +155,38 @@ export const registerHandlers = (ipc: IpcHandleLike, deps: HandlerDeps): void =>
     const summary = await deps.store.remember(project.value.dir, deps.now())
     deps.openWindow(project.value)
     return ok(summary)
+  })
+
+  /**
+   * The folder this window is an agent window *for*. Answering `undefined` is
+   * how every other window says "I am not one" — a project window has a project
+   * and the picker has neither.
+   */
+  ipc.handle(CHANNEL.currentPending, (event): PendingSnapshot | undefined => {
+    const id = deps.windowIdOf(event)
+    // The folder this window was *bound* to, never one it merely refused: a
+    // picker window that refused a folder is still the picker, and a window
+    // with a project keeps showing its project whatever its sheet turned down.
+    const dir = id === undefined ? undefined : deps.registry.agentFolderFor(id)
+    return dir === undefined ? undefined : { dir }
+  })
+
+  /**
+   * "Start the agent in that folder" — in a window of its own, rather than over
+   * the project the reader was reading. The folder is the sending window's
+   * pending one, so there is no directory on this wire in either direction.
+   */
+  ipc.handle(CHANNEL.openAgentWindow, (event): void => {
+    const id = deps.windowIdOf(event)
+    const dir = id === undefined ? undefined : deps.registry.refusalFor(id)
+    if (dir === undefined) return
+    // One agent per folder, which is the opposite of the rule for projects: a
+    // second window on a project is a second *reader*, and a second agent on a
+    // folder is two processes writing one `CLAUDE.md`. A repeated click brings
+    // the window that already exists to the front instead.
+    const existing = deps.registry.agentWindowsOn(dir).at(0)
+    if (existing === undefined) deps.openAgentWindow(dir)
+    else deps.focusWindow(existing)
   })
 
   ipc.handle(CHANNEL.listProjects, (): readonly ProjectSummary[] => deps.store.list())
@@ -190,15 +238,16 @@ export const registerHandlers = (ipc: IpcHandleLike, deps: HandlerDeps): void =>
     if (!input.success) return err({ kind: 'bad-request' })
     const id = deps.windowIdOf(event)
     if (id === undefined) return err({ kind: 'no-project' })
-    // A window with no project may still have a folder it just failed to open:
-    // that is the bootstrap sheet, running an agent where the wiki will be. The
-    // sheet can be opened over an *open* project, and then the window has both
-    // — so the panel asks for `pending` by name rather than being outranked by
-    // the project the reader is not pointing at.
+    // `pending` is the **agent window's** own folder, and a window that merely
+    // refused one is not an agent window: answering the refusal here would run
+    // an agent in a folder while the reader looks at another project's wiki.
+    // Since the bootstrap panel stopped starting panes, only a renderer asking
+    // by hand would ever reach that.
+    const project = deps.registry.projectFor(id)
     const cwd =
       input.data.scope === 'pending'
-        ? deps.registry.pendingFor(id)
-        : (deps.registry.projectFor(id)?.dir ?? deps.registry.pendingFor(id))
+        ? deps.registry.agentFolderFor(id)
+        : (project?.dir ?? deps.registry.agentFolderFor(id))
     if (cwd === undefined) return err({ kind: 'no-project' })
     // The id names a row in settings; the *command* is looked up here, so
     // nothing the renderer sent becomes an argv.

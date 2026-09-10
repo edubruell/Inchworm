@@ -126,3 +126,53 @@ describe('createRegistry', () => {
     expect(seen).toEqual([['/p/a', { kind: 'file', path: 'wiki/00_state.md' }]])
   })
 })
+
+/**
+ * The two folders a window can hold that are not its project: the one it
+ * refused, which only lets the picker offer an agent, and the one an agent
+ * window is *bound* to, which is what that window is.
+ */
+describe('folders that are not projects', () => {
+  test('a refusal is not a binding: refusing a folder does not make a window an agent window', () => {
+    const registry = createRegistry(fakeWatch().watch)
+    registry.rememberRefusal(1, '/bare')
+
+    expect(registry.refusalFor(1)).toBe('/bare')
+    expect(registry.agentFolderFor(1)).toBeUndefined()
+    expect(registry.agentWindowsOn('/bare')).toEqual([])
+  })
+
+  test('an agent window is listed by its folder, so a second ask can find it', () => {
+    const registry = createRegistry(fakeWatch().watch)
+    registry.bindAgent(3, '/bare')
+    registry.bindAgent(4, '/other')
+
+    expect(registry.agentWindowsOn('/bare')).toEqual([3])
+    expect(registry.agentFolderFor(3)).toBe('/bare')
+  })
+
+  test('both go when the window does, so a closed window is never found again', () => {
+    const registry = createRegistry(fakeWatch().watch)
+    registry.rememberRefusal(3, '/bare')
+    registry.bindAgent(3, '/bare')
+
+    registry.detach(3)
+
+    expect(registry.refusalFor(3)).toBeUndefined()
+    expect(registry.agentFolderFor(3)).toBeUndefined()
+    expect(registry.agentWindowsOn('/bare')).toEqual([])
+  })
+
+  /** An agent window holds no project, so it must neither start nor stop one. */
+  test('closing an agent window leaves another window\'s watcher alive', () => {
+    const fake = fakeWatch()
+    const registry = createRegistry(fake.watch)
+    registry.attach(1, projectA)
+    registry.bindAgent(2, '/bare')
+
+    registry.detach(2)
+
+    expect(registry.watching()).toEqual([projectA.dir])
+    expect(fake.stopped).toEqual([])
+  })
+})

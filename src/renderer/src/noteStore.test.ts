@@ -43,6 +43,8 @@ const fakeApi = (texts: Map<string, string>): Fake => {
       openProject: () => Promise.reject(new Error('unused')),
       listProjects: () => Promise.reject(new Error('unused')),
       currentProject: () => Promise.reject(new Error('unused')),
+      currentPending: () => Promise.reject(new Error('unused')),
+      openAgentWindow: () => Promise.reject(new Error('unused')),
       setAccent: () => Promise.resolve(),
       getSettings: () => Promise.reject(new Error('unused')),
       setSettings: () => Promise.reject(new Error('unused')),

@@ -68,6 +68,7 @@ const mount = async (
     readonly project?: ProjectSnapshot | undefined
     readonly recent?: readonly ProjectSummary[]
     readonly refuseOpen?: OpenProjectError
+    readonly pending?: { readonly dir: string }
     readonly files?: Map<string, string>
   } = {},
 ): Promise<FakeApi> => {
@@ -76,6 +77,7 @@ const mount = async (
     files: options.files ?? FILES,
     recent: options.recent,
     refuseOpen: options.refuseOpen,
+    pending: options.pending,
   })
   Object.defineProperty(window, 'wiki', { value: fake.api, configurable: true })
   dispose = render(() => <App />, document.body)
@@ -551,11 +553,11 @@ describe('the projects sheet, used', () => {
   /**
    * The bootstrap panel over a window that already has a project. The window
    * has two folders then — its own and the one just refused — and the agent
-   * belongs in the second: a pane started in the project the reader is not
-   * pointing at reads *that* project's wiki and looks like the app opened the
-   * wrong one.
+   * belongs in the second. It used to open a pane right here, which put a
+   * terminal initialising *another* folder inside this project's window; now
+   * the panel asks main for a window of its own and this one is left alone.
    */
-  test('the agent it offers is scoped to the refused folder, not to the window project', async () => {
+  test('the agent it offers opens a window rather than a pane over this project', async () => {
     const fake = await mount({ recent: RECENT, refuseOpen: { kind: 'no-llmwiki', dir: '/nope', markers: { agentFiles: [], wiki: false } } })
     await fire(fake, { kind: 'projects' })
     await click(sheet()?.querySelector('ul button'))
@@ -565,8 +567,50 @@ describe('the projects sheet, used', () => {
     )
     await click(start)
 
-    expect(fake.started).toEqual(['agent'])
-    expect(fake.scopes).toEqual(['pending'])
+    expect(fake.agentWindows()).toBe(1)
+    // Nothing was started in this window, which is the project the reader is
+    // reading and not the folder they pointed at.
+    expect(fake.started).toEqual([])
+    expect(fake.scopes).toEqual([])
+  })
+})
+
+/**
+ * The third window kind. ⌘⇧O is main's business there — an agent window holds
+ * no picker to open — so what is asserted here is that the *view* stays out of
+ * the way and shows the terminal rather than the front door.
+ */
+describe('an agent window', () => {
+  const AGENT = { project: undefined, pending: { dir: '/Users/e/git/newthing' } } as const
+
+  test('shows the folder and its terminal, and answers no project command', async () => {
+    const fake = await mount({ ...AGENT })
+
+    for (const command of [
+      { kind: 'palette' },
+      { kind: 'projects' },
+      { kind: 'section', section: 'notes' },
+    ] as const) {
+      await fire(fake, command)
+    }
+
+    expect(sheets()).toBe(0)
+    expect(document.querySelector('h1')?.textContent).toBe('claude in newthing')
+  })
+
+  test('names itself by its folder, so the Window menu can tell two of them apart', async () => {
+    await mount({ ...AGENT })
+
+    expect(document.title).toBe('newthing — claude')
+  })
+
+  // ⌘, is the app's, not a project's, and it reaches every window including this one.
+  test('still opens the settings sheet', async () => {
+    const fake = await mount({ ...AGENT })
+
+    await fire(fake, { kind: 'settings' })
+
+    expect(labelled('Settings')).not.toBeNull()
   })
 })
 

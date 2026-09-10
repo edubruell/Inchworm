@@ -28,6 +28,8 @@ export const CHANNEL = {
   openProject: 'project:open',
   listProjects: 'project:list',
   currentProject: 'project:current',
+  currentPending: 'project:pending',
+  openAgentWindow: 'project:agentWindow',
   setAccent: 'project:accent',
   readFile: 'file:read',
   writeFile: 'file:write',
@@ -161,6 +163,20 @@ export type ProjectSnapshot = {
   readonly layout: Layout
   /** Project-relative posix paths under the wiki root and journal, plus CLAUDE.md. */
   readonly files: readonly string[]
+}
+
+/**
+ * The folder an **agent window** is bound to: one that was refused for having
+ * no llmwiki block, and where the agent is now running so that it can write
+ * one. A window has either this or a project, never both — the two are the two
+ * things a window can be *about*.
+ *
+ * The directory is here to be *shown* — the header names the folder the agent
+ * is in — and never to be sent back: the pane asks for the `pending` scope and
+ * main resolves the folder from the window it came from.
+ */
+export type PendingSnapshot = {
+  readonly dir: string
 }
 
 /**
@@ -404,6 +420,19 @@ export type WikiApi = {
   readonly listProjects: () => Promise<readonly ProjectSummary[]>
   /** The project bound to *this* window; `undefined` in a window with none. */
   readonly currentProject: () => Promise<ProjectSnapshot | undefined>
+  /**
+   * The folder bound to *this* window when it is an agent window; `undefined`
+   * in every other window. A window that answers this is one the reader sent an
+   * agent into, and it shows a terminal and nothing else.
+   */
+  readonly currentPending: () => Promise<PendingSnapshot | undefined>
+  /**
+   * Opens an **agent window** on the folder this window last failed to open.
+   * It takes no argument on purpose: main already remembers that folder from
+   * its own refusal, so a renderer cannot ask for an agent in a directory of
+   * its choosing.
+   */
+  readonly openAgentWindow: () => Promise<void>
   readonly setAccent: (hue: number) => Promise<void>
   readonly readFile: (path: string) => Promise<Wire<FileContent, FileError>>
   readonly writeFile: (input: WriteFileInput) => Promise<Wire<FileStamp, FileError>>

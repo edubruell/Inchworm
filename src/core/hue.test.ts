@@ -5,7 +5,7 @@
  */
 
 import { describe, expect, test } from 'vitest'
-import { chromaFor, GRAPHITE, GRAPHITE_CHROMA, hueForPath, isPaletteHue, PALETTE } from './hue.js'
+import { AGENT_CHROMA, chromaFor, GRAPHITE, GRAPHITE_CHROMA, hueForPath, isPaletteHue, PALETTE } from './hue.js'
 
 describe('hueForPath', () => {
   test('always lands on the curated palette', () => {
@@ -67,6 +67,15 @@ describe('hueForPath', () => {
     expect(chromaFor(GRAPHITE)).toBe(GRAPHITE_CHROMA)
     expect(GRAPHITE_CHROMA).toBeLessThan(0.2)
     for (const hue of PALETTE) if (hue !== GRAPHITE) expect(chromaFor(hue)).toBe(1)
+  })
+
+  /**
+   * The agent window has to be recognisable beside the projects it is not, and
+   * graphite alone would not do it: graphite is a hue a project can be given.
+   */
+  test('the agent window is a true neutral, which no project hue can be', () => {
+    expect(AGENT_CHROMA).toBe(0)
+    for (const hue of PALETTE) expect(chromaFor(hue)).toBeGreaterThan(AGENT_CHROMA)
   })
 
   test('graphite is on the palette, so the picker offers it and main accepts it', () => {

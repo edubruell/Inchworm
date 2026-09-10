@@ -20,6 +20,7 @@ import type {
   FileError,
   FileStamp,
   OpenProjectError,
+  PendingSnapshot,
   ProjectEvent,
   ProjectSnapshot,
   ProjectSummary,
@@ -78,6 +79,15 @@ export const createApi = (ipc: IpcInvokeLike, pathForFile: PathForFile): WikiApi
 
   currentProject: (): Promise<ProjectSnapshot | undefined> =>
     ipc.invoke(CHANNEL.currentProject) as Promise<ProjectSnapshot | undefined>,
+
+  currentPending: (): Promise<PendingSnapshot | undefined> =>
+    ipc.invoke(CHANNEL.currentPending) as Promise<PendingSnapshot | undefined>,
+
+  // No payload: the folder is the one main refused for this window, and main is
+  // the only side that knows it.
+  openAgentWindow: async (): Promise<void> => {
+    await ipc.invoke(CHANNEL.openAgentWindow)
+  },
 
   setAccent: async (hue: number): Promise<void> => {
     await ipc.invoke(CHANNEL.setAccent, { hue })

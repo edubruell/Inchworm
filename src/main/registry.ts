@@ -27,16 +27,29 @@ export type Registry = {
   readonly detach: (windowId: number) => void
   readonly projectFor: (windowId: number) => OpenProject | undefined
   /**
-   * The folder a window last tried and failed to open. It is kept here rather
-   * than in the renderer because the renderer must never name a directory: the
-   * bootstrap sheet says "start an agent" under the `pending` scope, and *this*
-   * is the folder main starts it in. Any window can have one — the picker sheet
-   * opens over a window that already has a project — so it is a second folder
-   * beside the project, never a substitute for one. One per window, and it goes
-   * when the window does.
+   * The folder a window last tried and failed to open, kept so the bootstrap
+   * panel can offer an agent in it without the renderer ever naming a
+   * directory. Any window can have one — the picker opens as a sheet over a
+   * window that already has a project — so it is a second folder beside the
+   * project and never a substitute for one.
    */
-  readonly rememberPending: (windowId: number, dir: string) => void
-  readonly pendingFor: (windowId: number) => string | undefined
+  readonly rememberRefusal: (windowId: number, dir: string) => void
+  readonly refusalFor: (windowId: number) => string | undefined
+  /**
+   * Binds an **agent window** to the folder it is about: a window with no
+   * project, showing one agent running where the wiki is about to be. This is
+   * what a window *is*, not what it once refused, which is why it is a second
+   * map rather than a flag on the first — a picker window that refused a folder
+   * is not an agent window on it.
+   */
+  readonly bindAgent: (windowId: number, dir: string) => void
+  readonly agentFolderFor: (windowId: number) => string | undefined
+  /**
+   * Every agent window on this folder. Two agents writing one folder's
+   * `CLAUDE.md` and wiki at once is a race — the opposite of two windows on one
+   * project, which is two readers and deliberate.
+   */
+  readonly agentWindowsOn: (dir: string) => readonly number[]
   /** Every window on this project — the broadcast list. A project-scoped event
    * that answers only the sender desyncs every other window silently. */
   readonly windowsOn: (dir: string) => readonly number[]
@@ -48,7 +61,8 @@ export type Registry = {
 
 export const createRegistry = (watch: WatchProject): Registry => {
   const windows = new Map<number, OpenProject>()
-  const pending = new Map<number, string>()
+  const refusals = new Map<number, string>()
+  const agents = new Map<number, string>()
   const watchers = new Map<string, () => void>()
   const listeners: ((project: OpenProject, change: WatchChange) => void)[] = []
 
@@ -58,7 +72,8 @@ export const createRegistry = (watch: WatchProject): Registry => {
   const release = (windowId: number): void => {
     const project = windows.get(windowId)
     windows.delete(windowId)
-    pending.delete(windowId)
+    refusals.delete(windowId)
+    agents.delete(windowId)
     // The last window on the project, not the last window: closing one of two
     // windows on the same project must leave the other's watcher alive.
     if (project === undefined || windowsOn(project.dir).length > 0) return
@@ -67,10 +82,17 @@ export const createRegistry = (watch: WatchProject): Registry => {
   }
 
   return {
-    rememberPending: (windowId, dir): void => {
-      pending.set(windowId, dir)
+    rememberRefusal: (windowId, dir): void => {
+      refusals.set(windowId, dir)
     },
-    pendingFor: (windowId): string | undefined => pending.get(windowId),
+    refusalFor: (windowId): string | undefined => refusals.get(windowId),
+
+    bindAgent: (windowId, dir): void => {
+      agents.set(windowId, dir)
+    },
+    agentFolderFor: (windowId): string | undefined => agents.get(windowId),
+    agentWindowsOn: (dir): readonly number[] =>
+      [...agents.entries()].filter(([, at]) => at === dir).map(([id]) => id),
 
     attach: (windowId, project): void => {
       // Rebinding an id is not in the design (a window keeps its project for

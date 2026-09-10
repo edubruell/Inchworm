@@ -45,6 +45,17 @@ export const GRAPHITE = 250
  */
 export const GRAPHITE_CHROMA = 0.09
 
+/**
+ * The **agent window**'s slot: the same ramp with its chroma gone entirely.
+ *
+ * That window is about a folder rather than a project, and it has to be
+ * distinguishable at a glance from every window that *is* one — including a
+ * project whose reader chose graphite, which is a hue like any other and can be
+ * picked. A true neutral is the one thing no project can wear, and it costs a
+ * third value on the same multiplier rather than a second palette.
+ */
+export const AGENT_CHROMA = 0
+
 export const chromaFor = (hue: number): number => (hue === GRAPHITE ? GRAPHITE_CHROMA : 1)
 
 export const isPaletteHue = (hue: number): hue is Hue => (PALETTE as readonly number[]).includes(hue)

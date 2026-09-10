@@ -182,6 +182,12 @@ export type MenuEffects = {
   readonly openWindow: (project: OpenProject) => void
   /** A window with no project — which is the picker. */
   readonly createWindow: () => void
+  /**
+   * Whether that window is an **agent window**: bound to a folder, showing one
+   * terminal and no picker at all. The picker window answers `false` — it *is*
+   * the picker, and ⌘⇧O there is correctly a no-op.
+   */
+  readonly isAgentWindow: (windowId: number) => boolean
   /** Delivers to that window if it is still alive; a dead one is dropped. */
   readonly send: (windowId: number, command: Command) => void
   readonly isPackaged: boolean
@@ -189,10 +195,12 @@ export type MenuEffects = {
 
 export const createMenuActions = (effects: MenuEffects): MenuActions => ({
   // With every window closed the app is still running, and ⌘⇧O has to bring one
-  // back. A window that *is* the picker gets the command anyway: only the view
-  // knows whether it is a project window, and it ignores it if not.
+  // back. So does an agent window: it holds a terminal and no picker, so a
+  // command sent there would be dropped and the key would do nothing forever.
+  // A window that *is* the picker gets the command anyway: only the view knows
+  // whether it is a project window, and it ignores it if not.
   projects: (window): void => {
-    if (window === undefined) effects.createWindow()
+    if (window === undefined || effects.isAgentWindow(window.id)) effects.createWindow()
     else effects.send(window.id, { kind: 'projects' })
   },
 

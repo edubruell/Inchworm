@@ -18,6 +18,7 @@ import type {
   FileContent,
   FileError,
   OpenProjectError,
+  PendingSnapshot,
   ProjectEvent,
   ProjectSnapshot,
   ProjectSummary,
@@ -43,6 +44,8 @@ export type FakeApi = {
   readonly reads: readonly string[]
   /** Directories `openProject` was asked for. */
   readonly opened: readonly string[]
+  /** How many times the picker asked main for an agent window. */
+  readonly agentWindows: () => number
   /** Writes attempted, in order — the sha guard each one carried included. */
   readonly writes: readonly { readonly path: string; readonly text: string; readonly baseSha: string }[]
   /** URLs handed to the OS browser. */
@@ -82,6 +85,14 @@ export const fakeApi = (options: {
   readonly recent?: readonly ProjectSummary[] | undefined
   /** Make `openProject` fail, to put the picker's alert on screen. */
   readonly refuseOpen?: OpenProjectError | undefined
+  /**
+   * The folder this window is an agent window for. A window has this or a
+   * project, never both — and the fake enforces that the way main does, so a
+   * test cannot stage a window main would never produce.
+   */
+  readonly pending?: PendingSnapshot | undefined
+  /** Make `openAgentWindow` reject, as the bridge does with no handler. */
+  readonly refuseAgentWindow?: boolean | undefined
   /** Make the *next* write fail; cleared once it has, so a retry can succeed. */
   readonly refuseWrite?: FileError | undefined
   /** Make every `startPty` fail — the `claude`-is-not-on-PATH case. */
@@ -127,6 +138,7 @@ export const fakeApi = (options: {
   const scopes: (string | undefined)[] = []
   const saved: Settings[] = []
   const installs: string[] = []
+  let agentWindows = 0
   let debtReads = 0
   let skill: SkillStatus = options.skill ?? { state: 'absent', sha: '', files: SKILL_FILES.length }
   let refuseInstall = options.refuseInstall
@@ -156,6 +168,7 @@ export const fakeApi = (options: {
     output: (event): void => {
       for (const listener of [...ptys]) listener(event)
     },
+    agentWindows: () => agentWindows,
     livePanes: () => live.size,
     debtReads: () => debtReads,
     listening: () => ({ commands: commands.size, events: events.size }),
@@ -187,6 +200,15 @@ export const fakeApi = (options: {
         )
       },
       currentProject: () => Promise.resolve(options.project),
+      // Main's own rule: a window bound to a project is never an agent window,
+      // whatever its picker sheet turned down (`main/handlers.ts`).
+      currentPending: () => Promise.resolve(options.project === undefined ? options.pending : undefined),
+      openAgentWindow: (): Promise<void> => {
+        agentWindows += 1
+        return options.refuseAgentWindow === true
+          ? Promise.reject(new Error('no handler registered'))
+          : Promise.resolve()
+      },
       setAccent: (hue: number): Promise<void> => {
         accents.push(hue)
         return Promise.resolve()

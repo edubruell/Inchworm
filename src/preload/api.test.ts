@@ -39,11 +39,13 @@ describe('createApi', () => {
       [
         'chooseProject',
         'pathForFile',
+        'currentPending',
         'currentProject',
         'getSettings',
         'listProjects',
         'onCommand',
         'onPtyEvent',
+        'openAgentWindow',
         'openExternal',
         'startPty',
         'writePty',
@@ -93,6 +95,8 @@ describe('createApi', () => {
     await api.openProject('/p/a')
     await api.listProjects()
     await api.currentProject()
+    await api.currentPending()
+    await api.openAgentWindow()
     await api.setAccent(210)
     await api.readFile('wiki/00_state.md')
     await api.writeFile({ path: 'wiki/00_state.md', text: 'x', baseSha: 'abc' })
@@ -107,6 +111,9 @@ describe('createApi', () => {
       [CHANNEL.openProject, { dir: '/p/a' }],
       [CHANNEL.listProjects, undefined],
       [CHANNEL.currentProject, undefined],
+      [CHANNEL.currentPending, undefined],
+      // No payload at all: the folder is the one main refused for this window.
+      [CHANNEL.openAgentWindow, undefined],
       [CHANNEL.setAccent, { hue: 210 }],
       [CHANNEL.readFile, { path: 'wiki/00_state.md' }],
       [CHANNEL.writeFile, { path: 'wiki/00_state.md', text: 'x', baseSha: 'abc' }],

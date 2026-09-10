@@ -257,6 +257,7 @@ describe('what the actions do', () => {
 
   const wiring = (
     projects: ReadonlyMap<number, OpenProject>,
+    agentWindows: ReadonlySet<number> = new Set(),
   ): {
     readonly actions: MenuActions
     readonly opened: OpenProject[]
@@ -270,6 +271,7 @@ describe('what the actions do', () => {
       projectFor: (id) => projects.get(id),
       openWindow: (project) => opened.push(project),
       createWindow: () => created.push(1),
+      isAgentWindow: (id) => agentWindows.has(id),
       send: (id, command) => sent.push({ id, command }),
       isPackaged: false,
     }
@@ -292,6 +294,20 @@ describe('what the actions do', () => {
 
     expect(created).toEqual([])
     expect(sent).toEqual([{ id: 7, command: { kind: 'projects' } }])
+  })
+
+  /**
+   * An agent window holds a terminal and no picker, so a `projects` command
+   * sent there would be dropped and ⌘⇧O would be a key that does nothing for
+   * as long as that window is in front.
+   */
+  test('⌘⇧O in an agent window opens a picker window rather than being dropped', () => {
+    const { actions, created, sent } = wiring(new Map(), new Set([7]))
+
+    actions.projects(WINDOW)
+
+    expect(created).toHaveLength(1)
+    expect(sent).toEqual([])
   })
 
   test('⌘N opens a second window on the project the window is bound to', () => {

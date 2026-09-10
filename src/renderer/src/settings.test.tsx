@@ -331,18 +331,33 @@ describe('a folder with no llmwiki in it', () => {
     expect(document.body.textContent).toContain('half-way')
   })
 
-  test('offers the default agent, and starting it opens a pane in that folder', async () => {
+  test('offers the default agent, and asks main for a window on that folder', async () => {
     const fake = await openRefused()
 
     // The folder by name, not "here": the same panel is mounted in the picker
     // sheet over an open project, where "here" reads as that project.
     await click(button('Start claude in newthing'))
 
-    // The renderer named an agent; the folder is the one main just refused,
-    // which is why no directory crosses the bridge here.
-    expect(fake.started).toEqual(['agent'])
-    expect(fake.launched).toEqual(['claude'])
-    expect(document.querySelector('.xterm')).not.toBeNull()
+    // The panel is a door, not a terminal. It asks main for a window on the
+    // folder main itself refused — so no directory crosses the bridge, and no
+    // pane opens over whatever project this window is showing.
+    expect(fake.agentWindows()).toBe(1)
+    expect(fake.started).toEqual([])
+    expect(document.querySelector('.xterm')).toBeNull()
+  })
+
+  test('a window that could not be opened is reported, not swallowed', async () => {
+    await mount({
+      project: undefined,
+      recent: [{ dir: '/Users/e/git/newthing', name: 'newthing', hue: 300, lastOpenedMs: Date.now() }],
+      refuseOpen: NO_WIKI,
+      refuseAgentWindow: true,
+    })
+    await click(document.querySelector('.project-row'))
+
+    await click(button('Start claude in newthing'))
+
+    expect(document.body.textContent).toContain('Failed:')
   })
 
   test('the offered agent is whichever one settings call the default', async () => {
@@ -356,34 +371,7 @@ describe('a folder with no llmwiki in it', () => {
 
     expect(button('Start codex in newthing')).not.toBeUndefined()
     await click(button('Start codex in newthing'))
-    expect(fake.launched).toEqual(['codex'])
-  })
-
-  test('the agent takes the window rather than a strip inside the panel', async () => {
-    await openRefused()
-    await click(button('Start claude in newthing'))
-
-    // A conversation with an agent needs the window: the pane is the window's,
-    // not the panel's, and it carries its own way back.
-    const pane = document.querySelector('[aria-label="claude in /Users/e/git/newthing"]')
-    expect(pane).not.toBeNull()
-    expect(pane?.className).toContain('fixed')
-    expect(pane?.querySelector('.xterm')).not.toBeNull()
-    expect(pane?.textContent).toContain('Check newthing again')
-    // Below the title bar, so the traffic lights and the drag region survive.
-    expect(pane?.className).toContain('top-12')
-  })
-
-  test('closing the pane gives the folder panel back, and kills the pty', async () => {
-    const fake = await openRefused()
-    await click(button('Start claude in newthing'))
-    expect(fake.livePanes()).toBe(1)
-
-    await click(button('Close'))
-
-    expect(document.querySelector('[aria-label="claude in /Users/e/git/newthing"]')).toBeNull()
-    expect(button('Start claude in newthing')).not.toBeUndefined()
-    expect(fake.livePanes()).toBe(0)
+    expect(fake.agentWindows()).toBe(1)
   })
 
   test('check again re-opens the same folder, and the panel goes when it works', async () => {
@@ -406,6 +394,159 @@ describe('a folder with no llmwiki in it', () => {
     const panel = document.querySelector('[aria-label="Not an llmwiki project: newthing"]')
     expect(panel?.textContent).toContain('opens in a window of its own')
     expect(panel?.textContent).toContain('this window stays where it is')
+  })
+})
+
+/**
+ * The **agent window**: the folder that was refused, in a window of its own.
+ *
+ * It exists because the panel's pane used to be drawn in whichever window
+ * opened the picker — so an agent initialising a *new* folder appeared to be
+ * running inside the project the reader was reading. What is asserted here is
+ * the part that fixes that: this window is about a folder, it runs one agent in
+ * it without being asked twice, and it shows nothing else.
+ */
+describe('an agent window', () => {
+  const AGENT = { project: undefined, pending: { dir: '/Users/e/git/newthing' } } as const
+
+  test('starts the default agent in the folder, unasked, under the pending scope', async () => {
+    const fake = await mount({ ...AGENT })
+
+    expect(fake.started).toEqual(['agent'])
+    expect(fake.launched).toEqual(['claude'])
+    // The scope is the whole point: main resolves it to the refused folder, and
+    // a window that asked for `project` would land in somebody else's.
+    expect(fake.scopes).toEqual(['pending'])
+    expect(document.querySelector('.xterm')).not.toBeNull()
+  })
+
+  test('is the folder and the terminal, and not the front door', async () => {
+    await mount({ ...AGENT })
+
+    expect(document.querySelector('[aria-label="claude in /Users/e/git/newthing"]')).not.toBeNull()
+    // No picker underneath it: this window is not a window with "no project",
+    // it is a window about a folder.
+    expect(document.body.textContent).not.toContain('Open a project')
+    // The title bar names the folder, which is how two of these are told apart
+    // in the Window menu.
+    expect(document.querySelector('header')?.textContent).toBe('newthing')
+  })
+
+  test('wears no colour at all, so it is not mistaken for a project window', async () => {
+    await mount({ ...AGENT })
+
+    expect(document.documentElement.style.getPropertyValue('--project-chroma')).toBe('0')
+  })
+
+  /**
+   * The project decides whenever there is one. A window that has a project is a
+   * project window whatever folder its picker sheet turned down, and a
+   * colourless project window would be that rule failing where nobody looks.
+   */
+  test('a window with a project keeps its colour, whatever it once refused', async () => {
+    await mount({ project, files: new Map(FILES), pending: { dir: '/Users/e/git/newthing' } })
+
+    expect(document.documentElement.style.getPropertyValue('--project-chroma')).toBe('1')
+    expect(document.querySelector('[aria-label="claude in /Users/e/git/newthing"]')).toBeNull()
+  })
+
+  test('the agent it names is whichever one settings call the default', async () => {
+    const fake = await mount({ ...AGENT, settings: { ...TWO, defaultLauncherId: 'codex' } })
+
+    expect(fake.launched).toEqual(['codex'])
+    expect(document.querySelector('[aria-label="codex in /Users/e/git/newthing"]')).not.toBeNull()
+  })
+
+  test('checking the folder again opens it, and keeps the agent where it is', async () => {
+    const fake = await mount({ ...AGENT })
+
+    await click(button('Check newthing again'))
+
+    expect(fake.opened).toEqual(['/Users/e/git/newthing'])
+    // The window is not re-pointed and the pane is not killed: the agent may be
+    // mid-sentence, and main opened the project in a window of its own.
+    expect(fake.livePanes()).toBe(1)
+    expect(document.body.textContent).toContain('opened in a window of its own')
+  })
+
+  test('an agent that cannot be started says so in the window, not in the pane', async () => {
+    await mount({ ...AGENT, refusePty: { kind: 'spawn-failed', detail: 'no such file' } })
+
+    expect(document.querySelector('[role="alert"]')?.textContent).toContain('Could not start')
+    expect(document.querySelector('.xterm')).toBeNull()
+    // And it does not go on claiming it is starting something.
+    expect(document.body.textContent).not.toContain('Starting claude')
+  })
+
+  /**
+   * The start failure is permanent — nothing clears it, because this window
+   * starts one agent and never a second — so if it outranked the retry's answer
+   * the only working button in the window would be one that says nothing.
+   */
+  test('after a failed start, checking the folder again still reports what happened', async () => {
+    const fake = await mount({ ...AGENT, refusePty: { kind: 'spawn-failed', detail: 'no such file' } })
+
+    await click(button('Check newthing again'))
+
+    expect(fake.opened).toEqual(['/Users/e/git/newthing'])
+    expect(document.querySelector('[role="alert"]')?.textContent).toContain('opened in a window of its own')
+  })
+
+  test('a folder that still has no block says so rather than claiming success', async () => {
+    await mount({ ...AGENT, refuseOpen: NO_WIKI })
+
+    await click(button('Check newthing again'))
+
+    expect(document.querySelector('[role="alert"]')?.textContent).toContain('No llmwiki project')
+  })
+
+  /**
+   * The launcher is read once, at the start. A label derived from settings
+   * would rename a running `claude` to `codex` the moment the reader changed
+   * the default in some other window — the window would then name a process
+   * that is not the one it is showing.
+   */
+  test('a settings change elsewhere neither restarts the agent nor renames it', async () => {
+    const fake = await mount({ ...AGENT, settings: TWO })
+    expect(fake.started).toEqual(['agent'])
+
+    fake.settingsChanged({ ...TWO, defaultLauncherId: 'codex' })
+    await settle()
+
+    expect(fake.started).toEqual(['agent'])
+    expect(fake.livePanes()).toBe(1)
+    expect(document.querySelector('[aria-label="claude in /Users/e/git/newthing"]')).not.toBeNull()
+  })
+
+  /**
+   * The veto is all the renderer does; the dialog is main's (`main/window.ts`).
+   * A window whose agent has quit vetoes nothing, so the reflex ⌘W still works
+   * on the window there is nothing left to lose in.
+   */
+  test('a stray close is vetoed while the agent runs, and not after it quits', async () => {
+    const fake = await mount({ ...AGENT })
+
+    const running = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(running)
+    expect(running.defaultPrevented).toBe(true)
+
+    fake.output({ kind: 'exit', id: 1, code: 0 })
+    await settle()
+
+    const quit = new Event('beforeunload', { cancelable: true })
+    window.dispatchEvent(quit)
+    expect(quit.defaultPrevented).toBe(false)
+  })
+
+  test('an agent that has quit says so, and its output stays readable', async () => {
+    const fake = await mount({ ...AGENT })
+
+    fake.output({ kind: 'exit', id: 1, code: 0 })
+    await settle()
+
+    // Zero, deliberately: a clean exit is the case a truthiness test loses.
+    expect(document.querySelector('[role="status"]')?.textContent).toContain('exited (0)')
+    expect(document.querySelector('.xterm')).not.toBeNull()
   })
 })
 

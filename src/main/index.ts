@@ -123,22 +123,44 @@ const start = async (): Promise<void> => {
   app.on('browser-window-blur', syncMenu)
 
   /**
+   * A window and the teardown every window shares: the registry entry goes, the
+   * shells go with it, and the menu is recomputed because a closed window
+   * leaves no focus behind. `id` is captured before `closed`, because by then
+   * the window cannot be asked for it.
+   */
+  const bindWindow = (bind: (id: number) => void): void => {
+    const window = createWindow()
+    const id = window.id
+    bind(id)
+    window.on('closed', () => {
+      registry.detach(id)
+      ptys.closeWindow(id)
+      syncMenu()
+    })
+  }
+
+  /**
    * One window per open, even when the project is already open in another: the
    * project is bound for the window's lifetime, and the registry refcounts the
    * watcher behind it. `id` is captured before `closed`, because by then the
    * window cannot be asked for it.
    */
   const openWindow = (project: OpenProject): void => {
-    const window = createWindow()
-    const id = window.id
-    registry.attach(id, project)
-    window.on('closed', () => {
-      registry.detach(id)
-      // A closed window leaves no shells behind.
-      ptys.closeWindow(id)
-      // A closed window leaves no focus behind, so the item would stay enabled
-      // over nothing until some other window took focus.
-      syncMenu()
+    bindWindow((id) => {
+      registry.attach(id, project)
+    })
+  }
+
+  /**
+   * A window on a folder that is not a project yet: the agent, in that folder,
+   * with nothing else in the window. It is bound to the folder the way a
+   * project window is bound to its project — for life, and only main knows the
+   * path — so the pane it starts under the `pending` scope runs *there* and
+   * never in whichever project the reader happened to be reading.
+   */
+  const openAgentWindow = (dir: string): void => {
+    bindWindow((id) => {
+      registry.bindAgent(id, dir)
     })
   }
 
@@ -188,6 +210,7 @@ const start = async (): Promise<void> => {
           createWindow: () => {
             createWindow()
           },
+          isAgentWindow: (id) => registry.agentFolderFor(id) !== undefined,
           send,
           isPackaged: app.isPackaged,
         }),
@@ -202,6 +225,14 @@ const start = async (): Promise<void> => {
       BrowserWindow.fromWebContents(event.sender as WebContents)?.id,
     chooseDirectory,
     openWindow,
+    openAgentWindow,
+    focusWindow: (id: number): void => {
+      const window = BrowserWindow.fromId(id)
+      if (window !== null && !window.isDestroyed()) {
+        window.show()
+        window.focus()
+      }
+    },
     broadcast,
     openExternal: (url: string): Promise<void> => shell.openExternal(url),
     ptys,

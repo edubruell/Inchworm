@@ -15,7 +15,7 @@ import { CHANNEL, EVENT } from '@shared/api.js'
 import { projectEventFor, registerHandlers, type HandlerDeps, type IpcEventLike } from './handlers.js'
 import type { OpenProject } from './project.js'
 import { createPtyHost, type SpawnRequest } from './pty.js'
-import { createRegistry } from './registry.js'
+import { createRegistry, type Registry } from './registry.js'
 
 const fixture = (name: string): string => join(import.meta.dirname, '../../tests/fixtures', name)
 
@@ -34,6 +34,12 @@ type Harness = {
   readonly opened: OpenProject[]
   readonly broadcasts: [string, ProjectEvent][]
   readonly hues: Map<string, number>
+  /** The registry itself, so a test can bind an agent window as main does. */
+  readonly registry: Registry
+  /** Windows brought to the front, in order — the answer to a repeated open. */
+  readonly focused: readonly number[]
+  /** Folders an agent window was opened on, in order. */
+  readonly agentWindows: readonly string[]
   /** Every argv a pane was spawned with, so "who chose the command" is assertable. */
   readonly spawns: SpawnRequest[]
   /** Every guard digest an install carried, so a stale one is assertable. */
@@ -67,6 +73,8 @@ const harness = (
   if (second !== undefined) registry.attach(2, second)
 
   const debtReads: string[] = []
+  const agentWindows: string[] = []
+  const focused: number[] = []
 
   const deps: HandlerDeps = {
     registry,
@@ -105,6 +113,8 @@ const harness = (
     windowIdOf: (event) => (event.sender as { readonly id?: number }).id,
     chooseDirectory: () => Promise.resolve('/chosen'),
     openWindow: (project) => opened.push(project),
+    openAgentWindow: (dir) => agentWindows.push(dir),
+    focusWindow: (id) => focused.push(id),
     broadcast: (dir, event) => broadcasts.push([dir, event]),
     ptys: createPtyHost(
       (request) => {
@@ -137,6 +147,7 @@ const harness = (
   registerHandlers({ handle: (channel, listener) => registered.set(channel, listener) }, deps)
 
   return {
+    registry,
     channels: [...registered.keys()],
     remembered: summaries,
     opened,
@@ -145,6 +156,8 @@ const harness = (
     shells,
     hues,
     spawns,
+    agentWindows,
+    focused,
     settingsNow: () => settings,
     settingsBroadcasts,
     skillInstalls,
@@ -420,28 +433,68 @@ describe('projectEventFor', () => {
 describe('the folder that is not a project yet', () => {
   const bare = fixture('broken-projects/no-block')
 
-  test('a refused open is remembered as the pending folder, and an agent runs there', async () => {
+  /** A window main has bound to a folder, exactly as `openAgentWindow` does. */
+  const agentWindow = (app: Harness, id: number, dir: string = bare): void => {
+    app.registry.bindAgent(id, dir)
+  }
+
+  test('a refused open is remembered, and the panel can ask for a window on it', async () => {
     const app = harness('no-project')
 
     await app.call(CHANNEL.openProject, { dir: bare })
-    const started = await app.call(CHANNEL.startPty, { preset: 'agent', cols: 80, rows: 24 })
+    await app.call(CHANNEL.openAgentWindow)
 
     // The renderer asked for "an agent"; the *folder* is the one main itself
     // just failed to open.
+    expect(app.agentWindows).toEqual([bare])
+  })
+
+  /**
+   * A refusal is not a binding. The picker window that was told "no llmwiki
+   * here" may offer the agent, and that is all it may do — the folder becomes
+   * a place this app runs something only in the window main opens for it.
+   */
+  test('a window that only refused a folder still has nowhere to run', async () => {
+    const app = harness('no-project')
+
+    await app.call(CHANNEL.openProject, { dir: bare })
+
+    for (const scope of [undefined, 'pending']) {
+      expect(await app.call(CHANNEL.startPty, { preset: 'agent', cols: 80, rows: 24, scope })).toEqual({
+        ok: false,
+        error: { kind: 'no-project' },
+      })
+    }
+    expect(app.spawns).toHaveLength(0)
+  })
+
+  /**
+   * The refusal main keeps is the one it made itself, and only the kind that
+   * means "a real folder, waiting for its wiki". Any other refusal — a path
+   * that is not a directory at all — is a path the renderer chose, and it must
+   * not become somewhere this app will later run an agent.
+   */
+  test('a refusal that is not "no llmwiki" is never remembered', async () => {
+    const app = harness('no-project')
+
+    await app.call(CHANNEL.openProject, { dir: join(bare, 'CLAUDE.md') })
+    await app.call(CHANNEL.openAgentWindow)
+
+    expect(app.agentWindows).toEqual([])
+    expect(await app.call(CHANNEL.currentPending)).toBeUndefined()
+  })
+
+  test('an agent window runs its agent in the folder it is bound to', async () => {
+    const app = harness('no-project')
+    agentWindow(app, 1)
+
+    const started = await app.call(CHANNEL.startPty, { preset: 'agent', cols: 80, rows: 24, scope: 'pending' })
+
     expect(started).toMatchObject({ ok: true })
     expect(app.spawns.at(-1)?.cwd).toBe(bare)
   })
 
-  test('a window with no project and no refusal behind it still has nowhere to run', async () => {
-    const app = harness('no-project')
-
-    expect(await app.call(CHANNEL.startPty, { preset: 'agent', cols: 80, rows: 24 })).toEqual({
-      ok: false,
-      error: { kind: 'no-project' },
-    })
-  })
-
-  test('the drawer of a window bound to a project ignores any pending folder — the project wins', async () => {
+  test('the drawer of a window bound to a project ignores any refusal — the project wins', async () => {
     const app = harness()
 
     await app.call(CHANNEL.openProject, { dir: bare })
@@ -452,29 +505,68 @@ describe('the folder that is not a project yet', () => {
 
   /**
    * The picker is mounted twice: as the window with no project, and as a sheet
-   * over one that has a project. The bootstrap panel is the same component in
-   * both, and in the second the window has *both* folders — so the panel names
-   * the scope, or the agent runs in the project the reader is not pointing at
-   * and reads its wiki instead.
+   * over one that has a project. Neither mount may reach the refused folder
+   * with a pane — that is what the agent window is for — so `pending` in a
+   * window that has a project is refused rather than resolved.
    */
-  test('the bootstrap panel runs in the refused folder even in a window that has a project', async () => {
+  test('the pending scope is refused in a window that has a project', async () => {
     const app = harness()
 
     await app.call(CHANNEL.openProject, { dir: bare })
-    const started = await app.call(CHANNEL.startPty, { preset: 'agent', cols: 80, rows: 24, scope: 'pending' })
-
-    expect(started).toMatchObject({ ok: true })
-    expect(app.spawns.at(-1)?.cwd).toBe(bare)
-  })
-
-  test('the pending scope never falls back to the project', async () => {
-    const app = harness()
 
     expect(await app.call(CHANNEL.startPty, { preset: 'agent', cols: 80, rows: 24, scope: 'pending' })).toEqual({
       ok: false,
       error: { kind: 'no-project' },
     })
     expect(app.spawns).toHaveLength(0)
+  })
+
+  test('a window with no folder at all has nowhere to run', async () => {
+    const app = harness('no-project')
+
+    expect(await app.call(CHANNEL.startPty, { preset: 'agent', cols: 80, rows: 24 })).toEqual({
+      ok: false,
+      error: { kind: 'no-project' },
+    })
+  })
+
+  /**
+   * Two windows on one project is two readers and deliberate. Two agents on one
+   * folder is two processes writing the same `CLAUDE.md`, so the second ask
+   * brings the first window back instead.
+   */
+  test('a second ask for the same folder focuses the window that already has it', async () => {
+    const app = harness('no-project')
+    agentWindow(app, 7)
+
+    await app.call(CHANNEL.openProject, { dir: bare })
+    await app.call(CHANNEL.openAgentWindow)
+
+    expect(app.agentWindows).toEqual([])
+    expect(app.focused).toEqual([7])
+  })
+
+  test('an agent window says which folder it is for, so the window can name it', async () => {
+    const app = harness('no-project')
+    agentWindow(app, 1)
+
+    expect(await app.call(CHANNEL.currentPending)).toEqual({ dir: bare })
+  })
+
+  /**
+   * A refusal in a picker sheet must not turn the project window behind it into
+   * an agent window, and the picker itself is not one either: it is the window
+   * that *offers* the agent.
+   */
+  test('a window that refused a folder is not thereby an agent window', async () => {
+    const withProject = harness()
+    const picker = harness('no-project')
+
+    await withProject.call(CHANNEL.openProject, { dir: bare })
+    await picker.call(CHANNEL.openProject, { dir: bare })
+
+    expect(await withProject.call(CHANNEL.currentPending)).toBeUndefined()
+    expect(await picker.call(CHANNEL.currentPending)).toBeUndefined()
   })
 
   test('a scope that names neither folder is refused before anything is spawned', async () => {
