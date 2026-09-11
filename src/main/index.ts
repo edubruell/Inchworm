@@ -12,6 +12,7 @@ import { join } from 'node:path'
 import { spawn as spawnPty } from 'node-pty'
 import type { Command, ProjectEvent, PtyEvent } from '@shared/api.js'
 import { EVENT } from '@shared/api.js'
+import { paneEnv } from '@core/env.js'
 import { projectEventFor, registerHandlers, type IpcEventLike } from './handlers.js'
 import type { OpenProject } from './project.js'
 import { NEW_WINDOW_ITEM, createMenuActions, menuTemplate, newWindowEnabled } from './menu.js'
@@ -192,7 +193,7 @@ const start = async (): Promise<void> => {
         cwd: request.cwd,
         cols: request.cols,
         rows: request.rows,
-        env: { ...process.env },
+        env: paneEnv(process.env),
       }),
     (windowId: number, event: PtyEvent) => {
       to(windowId, EVENT.pty, event)
