@@ -241,11 +241,11 @@ hasnt "$out" "declared wiki root does not exist" "a backticked Wiki root resolve
 echo "the pinned clock — a suite that straddles midnight is a gate with a hole in it"
 PIN=/tmp/llmwiki-pinned; rm -rf $PIN; mkdir -p $PIN/wiki
 printf '## Project memory (llmwiki)\n- Wiki root: wiki/\n' > $PIN/CLAUDE.md
-rm -rf "$HOME/.claude/sessions/$(python3 -c "import hashlib,sys;print(hashlib.md5(sys.argv[1].encode()).hexdigest()[:8])" "$PIN")" 2>/dev/null
+rm -rf "$HOME/.claude/sessions/$(python3 -c "import hashlib,pathlib,sys;print(hashlib.md5(str(pathlib.Path(sys.argv[1]).resolve()).encode()).hexdigest()[:8])" "$PIN")" 2>/dev/null
 out=$($CHK --json $PIN)
 python3 -c "import json,sys; sys.exit(0 if json.loads(sys.stdin.read())['cutoff']=='2026-09-03' else 1)" <<<"$out" \
   && ok "LLMWIKI_TODAY reaches the derived cutoff, so no case reads the wall clock" || bad "pin ignored" "$out"
-rm -rf "$HOME/.claude/sessions/$(python3 -c "import hashlib,sys;print(hashlib.md5(sys.argv[1].encode()).hexdigest()[:8])" "$PIN")" 2>/dev/null
+rm -rf "$HOME/.claude/sessions/$(python3 -c "import hashlib,pathlib,sys;print(hashlib.md5(str(pathlib.Path(sys.argv[1]).resolve()).encode()).hexdigest()[:8])" "$PIN")" 2>/dev/null
 out=$(LLMWIKI_TODAY=not-a-date $CHK --json $PIN 2>&1); rc=$?
 [ $rc -eq 0 ] && python3 -c "import json,sys,datetime as dt; sys.exit(0 if json.loads(sys.stdin.read())['cutoff']==dt.date.today().isoformat() else 1)" <<<"$out" \
   && ok "a malformed pin falls back to the clock rather than breaking a hook" || bad "bad pin" "rc=$rc $out"

@@ -72,6 +72,8 @@ That omission is most of what makes the declaration safe for a GUI to read.
                      lives in a capped register.
   archive/           overflow from capped files; bodies of superseded notes
 <JOURNAL>/           append-only dated notes/session logs (pre-existing)
+                     YYYY-MM-DD_<slug>.md, and YYYY-MM-DDb_<slug>.md,
+                     ...c, ...d for the second and later sessions of one day
 ```
 
 The wiki layer is gitignored. Stable data documentation still promotes to
@@ -457,7 +459,11 @@ is why step 3 checks it mechanically instead of trusting step 1.
    `decisions.md`.
 
 6. Append a journal entry `<JOURNAL>/YYYY-MM-DD_<slug>.md` (or a dated
-   addendum to today's existing entry). Skeleton:
+   addendum to today's existing entry). A second session on the same day takes
+   a letter between the date and the separator —
+   `YYYY-MM-DDb_<slug>.md`, then `...c`, `...d` — rather than overwriting the
+   day's first entry or inventing a second separator. The letter is lower case,
+   single, and starts at `b`: the day's first entry carries none. Skeleton:
    headline outcome → the finding (if any) → consequences for the design →
    what was built → decisions taken → **nothing has run / unverified** →
    files touched (new:/rewritten:/updated:).

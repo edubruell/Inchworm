@@ -12,7 +12,7 @@ import { badge, statusLabel } from '../scripts/format.js'
 
 const REGISTER: WikiFileKind = { kind: 'register', register: 'decisions' }
 const NOTE: WikiFileKind = { kind: 'note', number: 3, topic: 'storage' }
-const JOURNAL: WikiFileKind = { kind: 'journal', date: '2026-08-19', slug: 'x' }
+const JOURNAL: WikiFileKind = { kind: 'journal', date: '2026-08-19', session: '', slug: 'x' }
 
 describe('badge', () => {
   test.each([

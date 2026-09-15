@@ -64,7 +64,14 @@ const orderOf = (entry: NavEntry): number => {
 
 const compare = (a: NavEntry, b: NavEntry): number => {
   if (a.kind.kind === 'journal' && b.kind.kind === 'journal') {
-    return b.kind.date.localeCompare(a.kind.date) || b.path.localeCompare(a.path)
+    // Newest first, and within a day the later session first: `2026-09-15c`,
+    // then `2026-09-15b`, then the unsuffixed entry the day opened with, whose
+    // empty `session` sorts below every letter.
+    return (
+      b.kind.date.localeCompare(a.kind.date) ||
+      b.kind.session.localeCompare(a.kind.session) ||
+      b.path.localeCompare(a.path)
+    )
   }
   return orderOf(a) - orderOf(b) || a.path.localeCompare(b.path)
 }

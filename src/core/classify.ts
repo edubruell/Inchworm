@@ -17,8 +17,12 @@ export type WikiFileKind =
   | { readonly kind: 'register'; readonly register: RegisterName }
   /** Anything under `<wiki>/archive/` — overflow and superseded bodies. */
   | { readonly kind: 'archive' }
-  /** `<journal>/YYYY-MM-DD_slug.md`. */
-  | { readonly kind: 'journal'; readonly date: string; readonly slug: string }
+  /**
+   * `<journal>/YYYY-MM-DD_slug.md`, or `YYYY-MM-DDb_slug.md` for the second and
+   * later sessions of one day. `session` is that suffix folded to lower case,
+   * and `''` for the day's first entry, which carries none.
+   */
+  | { readonly kind: 'journal'; readonly date: string; readonly session: string; readonly slug: string }
   | { readonly kind: 'claudeMd' }
   /** A markdown file in a wiki folder that the schema does not name, or a non-note. */
   | { readonly kind: 'other' }
@@ -26,7 +30,13 @@ export type WikiFileKind =
 const OTHER = { kind: 'other' } as const
 
 const NOTE_NAME = /^(\d{2})_(.+)$/
-const JOURNAL_NAME = /^(\d{4}-\d{2}-\d{2})(?:[_-](.*))?$/
+/**
+ * The optional letter is a same-day session counter — `2026-09-15`, then
+ * `2026-09-15b`, then `2026-09-15c` — so it sits between the date and the
+ * separator. A slug still needs that separator, which keeps `2026-09-15final`
+ * `other` rather than session `f` of a day.
+ */
+const JOURNAL_NAME = /^(\d{4}-\d{2}-\d{2})([A-Za-z])?(?:[_-](.*))?$/
 
 /**
  * macOS filesystems are case-insensitive, so `Decisions.md` and `decisions.md`
@@ -71,7 +81,7 @@ const classifyInJournal = (path: string, journal: string): WikiFileKind => {
 
   const dated = JOURNAL_NAME.exec(stem(within))
   if (dated?.[1] === undefined || !isCalendarDate(dated[1])) return OTHER
-  return { kind: 'journal', date: dated[1], slug: dated[2] ?? '' }
+  return { kind: 'journal', date: dated[1], session: fold(dated[2] ?? ''), slug: dated[3] ?? '' }
 }
 
 /**

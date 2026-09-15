@@ -77,6 +77,18 @@ describe('buildNavigation', () => {
     ])
   })
 
+  test('a lettered session outranks the day it belongs to, latest letter first', () => {
+    const sameDay = buildNavigation(
+      ['notes/2026-09-15_first.md', 'notes/2026-09-15c_third.md', 'notes/2026-09-15b_second.md'],
+      layout,
+    )
+    expect(sameDay.find((group) => group.section === 'journal')?.entries.map((entry) => entry.name)).toEqual([
+      '2026-09-15c_third.md',
+      '2026-09-15b_second.md',
+      '2026-09-15_first.md',
+    ])
+  })
+
   test('journal entries on the same day fall back to the path, newest name first', () => {
     const sameDay = buildNavigation(['notes/2026-08-18_a.md', 'notes/2026-08-18_b.md'], layout)
     expect(sameDay.find((group) => group.section === 'journal')?.entries.map((entry) => entry.name)).toEqual([

@@ -43,11 +43,28 @@ describe('classify', () => {
   })
 
   test.each([
-    ['2026-08-18_storage_swap.md', '2026-08-18', 'storage_swap'],
-    ['2026-01-02_a.md', '2026-01-02', 'a'],
-    ['2026-01-02.md', '2026-01-02', ''],
-  ])('%s is a journal entry', (name, date, slug) => {
-    expect(classify(j(name), layout)).toEqual({ kind: 'journal', date, slug })
+    ['2026-08-18_storage_swap.md', '2026-08-18', '', 'storage_swap'],
+    ['2026-01-02_a.md', '2026-01-02', '', 'a'],
+    ['2026-01-02.md', '2026-01-02', '', ''],
+  ])('%s is a journal entry', (name, date, session, slug) => {
+    expect(classify(j(name), layout)).toEqual({ kind: 'journal', date, session, slug })
+  })
+
+  // A second session on one day appends a letter to the date, and those entries
+  // were `other` until 2026-09-15 — invisible in the sidebar of any project
+  // that runs more than one session a day.
+  test.each([
+    ['2026-09-15b_next-analysis-steps.md', '2026-09-15', 'b', 'next-analysis-steps'],
+    ['2026-09-15c_scout-returned.md', '2026-09-15', 'c', 'scout-returned'],
+    ['2026-09-15B_shouting.md', '2026-09-15', 'b', 'shouting'],
+    ['2026-09-15b.md', '2026-09-15', 'b', ''],
+  ])('%s is session %s of its day', (name, date, session, slug) => {
+    expect(classify(j(name), layout)).toEqual({ kind: 'journal', date, session, slug })
+  })
+
+  test('a letter run into the slug is not a session: the separator is what makes one', () => {
+    expect(classify(j('2026-09-15final.md'), layout)).toEqual({ kind: 'other' })
+    expect(classify(j('2026-09-15bb_two-letters.md'), layout)).toEqual({ kind: 'other' })
   })
 
   test('CLAUDE.md is the project block only at the root', () => {

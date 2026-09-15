@@ -14,7 +14,7 @@ describe('capFor', () => {
     [{ kind: 'register', register: 'decisions' }, 100],
     [{ kind: 'claudeMd' }, 150],
     [{ kind: 'note', number: 2, topic: 'design' }, undefined],
-    [{ kind: 'journal', date: '2026-08-18', slug: 'a' }, undefined],
+    [{ kind: 'journal', date: '2026-08-18', session: '', slug: 'a' }, undefined],
     [{ kind: 'archive' }, undefined],
     [{ kind: 'other' }, undefined],
   ])('%o has cap %s', (kind, expected) => {
