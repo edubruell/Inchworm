@@ -67,6 +67,21 @@ describe('classify', () => {
     expect(classify(j('2026-09-15bb_two-letters.md'), layout)).toEqual({ kind: 'other' })
   })
 
+  // The letter sits before the separator, and only there. Written after one it
+  // is the first word of the slug, which is a quieter wrong answer than `other`
+  // — the entry shows, at the bottom of its day — so it is pinned here.
+  test.each([
+    ['2026-09-15b-hyphen-slug.md', 'b', 'hyphen-slug'],
+    ['2026-09-15-b_after-the-separator.md', '', 'b_after-the-separator'],
+    ['2026-09-15_b.md', '', 'b'],
+  ])('%s has session "%s"', (name, session, slug) => {
+    expect(classify(j(name), layout)).toEqual({ kind: 'journal', date: '2026-09-15', session, slug })
+  })
+
+  test('a letter does not rescue a date that is not a day', () => {
+    expect(classify(j('2026-02-30b_nope.md'), layout)).toEqual({ kind: 'other' })
+  })
+
   test('CLAUDE.md is the project block only at the root', () => {
     expect(classify('CLAUDE.md', layout)).toEqual({ kind: 'claudeMd' })
     expect(classify('vendor/CLAUDE.md', layout)).toEqual({ kind: 'other' })

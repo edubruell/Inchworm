@@ -139,6 +139,7 @@ describe('buildLinkIndex + resolveLink', () => {
     'wiki/archive/03_storage.md',
     'wiki/03_storage.md',
     'notes/2026-08-18_swap.md',
+    'notes/2026-08-18b_second-swap.md',
     'CLAUDE.md',
     'src/core/note.ts',
   ]
@@ -149,6 +150,9 @@ describe('buildLinkIndex + resolveLink', () => {
     ['decisions', 'wiki/decisions.md'],
     ['00_state', 'wiki/00_state.md'],
     ['2026-08-18_swap', 'notes/2026-08-18_swap.md'],
+    // A lettered entry was `other` until 2026-09-15, so a link to the day's
+    // second session dangled in a wiki that had written one.
+    ['2026-08-18b_second-swap', 'notes/2026-08-18b_second-swap.md'],
   ])('[[%s]] resolves to %s', (target, path) => {
     expect(resolveLink(target, index)).toEqual({ status: 'resolved', path })
   })

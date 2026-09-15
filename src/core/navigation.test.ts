@@ -77,6 +77,31 @@ describe('buildNavigation', () => {
     ])
   })
 
+  // Transposing the date and session clauses of `compare` passes every
+  // single-day case; only a lettered entry on the *older* day catches it.
+  test('the date outranks the letter: yesterday`s third session is still older', () => {
+    const acrossDays = buildNavigation(['notes/2026-09-14c_late.md', 'notes/2026-09-15_early.md'], layout)
+    expect(acrossDays.find((group) => group.section === 'journal')?.entries.map((entry) => entry.name)).toEqual([
+      '2026-09-15_early.md',
+      '2026-09-14c_late.md',
+    ])
+  })
+
+  // A case-sensitive filesystem — the Linux and Windows ports — can hold both
+  // spellings at once, and folding is what keeps `B` beside `b` rather than
+  // ahead of `c`, where a raw codepoint comparison would put it.
+  test('an upper-case letter sorts as its folded self', () => {
+    const shouted = buildNavigation(
+      ['notes/2026-09-15_first.md', 'notes/2026-09-15c_third.md', 'notes/2026-09-15B_second.md'],
+      layout,
+    )
+    expect(shouted.find((group) => group.section === 'journal')?.entries.map((entry) => entry.name)).toEqual([
+      '2026-09-15c_third.md',
+      '2026-09-15B_second.md',
+      '2026-09-15_first.md',
+    ])
+  })
+
   test('a lettered session outranks the day it belongs to, latest letter first', () => {
     const sameDay = buildNavigation(
       ['notes/2026-09-15_first.md', 'notes/2026-09-15c_third.md', 'notes/2026-09-15b_second.md'],

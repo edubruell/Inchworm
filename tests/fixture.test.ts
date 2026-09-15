@@ -187,9 +187,10 @@ describe('navigation over the fixture', () => {
       'deletions.md',
     ])
     expect(entries('journal')).toEqual([
-      // Same day: the path breaks the tie in the same direction as the date.
+      // The day's second session carries a letter, and outranks the entry the
+      // day opened with; the older day stays below both.
+      '2026-08-18b_registers_over_cap.md',
       '2026-08-18_storage_swap.md',
-      '2026-08-18_registers_over_cap.md',
       '2026-08-17_kickoff.md',
     ])
     expect(entries('archive')).toEqual(['03_storage.md'])

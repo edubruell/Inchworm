@@ -463,7 +463,9 @@ is why step 3 checks it mechanically instead of trusting step 1.
    a letter between the date and the separator —
    `YYYY-MM-DDb_<slug>.md`, then `...c`, `...d` — rather than overwriting the
    day's first entry or inventing a second separator. The letter is lower case,
-   single, and starts at `b`: the day's first entry carries none. Skeleton:
+   single, and starts at `b`: the day's first entry carries none. It goes
+   *before* the separator; `YYYY-MM-DD-b_<slug>.md` reads as a slug beginning
+   with `b`, and the entry then sorts as the day's first. Skeleton:
    headline outcome → the finding (if any) → consequences for the design →
    what was built → decisions taken → **nothing has run / unverified** →
    files touched (new:/rewritten:/updated:).

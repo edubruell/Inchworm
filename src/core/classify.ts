@@ -20,7 +20,9 @@ export type WikiFileKind =
   /**
    * `<journal>/YYYY-MM-DD_slug.md`, or `YYYY-MM-DDb_slug.md` for the second and
    * later sessions of one day. `session` is that suffix folded to lower case,
-   * and `''` for the day's first entry, which carries none.
+   * and `''` for the day's first entry, which carries none. The skill writes
+   * `b` onward; any letter is read, so a project that letters from `a` sorts
+   * the way it means to rather than falling out of the journal.
    */
   | { readonly kind: 'journal'; readonly date: string; readonly session: string; readonly slug: string }
   | { readonly kind: 'claudeMd' }
@@ -42,7 +44,7 @@ const JOURNAL_NAME = /^(\d{4}-\d{2}-\d{2})([A-Za-z])?(?:[_-](.*))?$/
  * macOS filesystems are case-insensitive, so `Decisions.md` and `decisions.md`
  * are one file, and treating them as two kinds would make a `[[decisions]]`
  * link resolve or dangle depending on how the agent capitalised the file.
- * Only the schema's own names are folded; the topic and
+ * Only the schema's own names and the session letter are folded; the topic and
  * slug keep the author's capitalisation, because they are shown.
  */
 const fold = (name: string): string => name.toLowerCase()

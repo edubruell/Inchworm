@@ -106,16 +106,16 @@ python3 -c "import json,sys; d=json.loads(sys.stdin.read()); sys.exit(0 if len(d
 
 echo "overdue — quiet unless something is genuinely overdue"
 export LLMWIKI_JOURNAL_DAYS=99999 LLMWIKI_LINT_DAYS=99999 LLMWIKI_JOURNAL_SESSIONS=2 LLMWIKI_LINT_SESSIONS=99999
-rm -rf "$HOME/.claude/sessions/$(python3 -c "import hashlib,sys;print(hashlib.md5(sys.argv[1].encode()).hexdigest()[:8])" "$PWD/testwiki/contentionproj")" 2>/dev/null
+rm -rf "$HOME/.claude/sessions/$(python3 -c "import hashlib,pathlib,sys;print(hashlib.md5(str(pathlib.Path(sys.argv[1]).resolve()).encode()).hexdigest()[:8])" "$PWD/testwiki/contentionproj")" 2>/dev/null
 out=$(python3 wiki-overdue.py testwiki/contentionproj)
 hasnt "$out" "no journal entry since" "first session does not nag about the journal"
 python3 wiki-overdue.py testwiki/contentionproj >/dev/null
 out=$(python3 wiki-overdue.py testwiki/contentionproj)
 has "$out" "no journal entry since" "nags once the session count passes the threshold"
-touch testwiki/contentionproj/journal/2026-08-24_second-entry.md
+touch testwiki/contentionproj/journal/2026-08-24b_second-entry.md
 out=$(python3 wiki-overdue.py testwiki/contentionproj)
 hasnt "$out" "no journal entry since" "a second entry on the same day resets the counter"
-rm -f testwiki/contentionproj/journal/2026-08-24_second-entry.md
+rm -f testwiki/contentionproj/journal/2026-08-24b_second-entry.md
 out=$(LLMWIKI_JOURNAL_SESSIONS=99999 python3 wiki-overdue.py testwiki/cleanproj)
 has "$out" "no lint verdict on record" "a wiki that never linted is reported"
 out=$(printf '{"cwd":"%s/testwiki/contentionproj/wiki"}' "$PWD" | python3 wiki-overdue.py --hook); rc=$?
@@ -246,13 +246,20 @@ out=$($CHK --json $PIN)
 python3 -c "import json,sys; sys.exit(0 if json.loads(sys.stdin.read())['cutoff']=='2026-09-03' else 1)" <<<"$out" \
   && ok "LLMWIKI_TODAY reaches the derived cutoff, so no case reads the wall clock" || bad "pin ignored" "$out"
 rm -rf "$HOME/.claude/sessions/$(python3 -c "import hashlib,pathlib,sys;print(hashlib.md5(str(pathlib.Path(sys.argv[1]).resolve()).encode()).hexdigest()[:8])" "$PIN")" 2>/dev/null
+# The clock is read either side of the run rather than after it: this case is
+# the one place the suite must consult the real date, and a run that crosses
+# midnight would otherwise fail on a correct checker.
+day_before=$(date +%F)
 out=$(LLMWIKI_TODAY=not-a-date $CHK --json $PIN 2>&1); rc=$?
-[ $rc -eq 0 ] && python3 -c "import json,sys,datetime as dt; sys.exit(0 if json.loads(sys.stdin.read())['cutoff']==dt.date.today().isoformat() else 1)" <<<"$out" \
+day_after=$(date +%F)
+[ $rc -eq 0 ] && python3 -c "import json,sys; sys.exit(0 if json.loads(sys.stdin.read())['cutoff'] in (sys.argv[1], sys.argv[2]) else 1)" "$day_before" "$day_after" <<<"$out" \
   && ok "a malformed pin falls back to the clock rather than breaking a hook" || bad "bad pin" "rc=$rc $out"
 out=$(LLMWIKI_TODAY=2026-09-03 python3 wiki-contentions.py --json testwiki/contentionproj)
 python3 -c "import json,sys; d=json.loads(sys.stdin.read()); c=[x for x in d['contentions'] if x['id']=='C2'][0]; sys.exit(0 if c['age_days']==14 else 1)" <<<"$out" \
   && ok "and contentions age against it too: C2 is 14 days old, every run" || bad "contentions pin" "$out"
-rm -rf $PIN
+# The derived cutoff is remembered under $HOME, so the fixture cleans up there
+# too: a suite that leaves state behind is a suite whose next run differs.
+rm -rf $PIN "$HOME/.claude/sessions/$(python3 -c "import hashlib,pathlib,sys;print(hashlib.md5(str(pathlib.Path(sys.argv[1]).resolve()).encode()).hexdigest()[:8])" "$PIN")"
 
 printf "\n%d passed, %d failed\n" "$pass" "$fail"
 [ "$fail" -eq 0 ]
