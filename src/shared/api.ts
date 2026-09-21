@@ -43,6 +43,7 @@ export const CHANNEL = {
   skillStatus: 'skill:status',
   installSkill: 'skill:install',
   readDebt: 'debt:read',
+  exportWiki: 'wiki:export',
 } as const
 
 export type Channel = (typeof CHANNEL)[keyof typeof CHANNEL]
@@ -129,6 +130,18 @@ export type StartPtyInput = {
    */
   readonly launcherId?: string | undefined
 }
+
+/**
+ * The two export bundles, and they answer two different questions: the whole
+ * memory of a project for the reader's own second machine, or the curated layer
+ * another person can read. Which files each one takes is schema knowledge and
+ * lives in `core/export.ts`; this is the word the renderer sends.
+ */
+export const EXPORT_SCOPES = ['everything', 'curated'] as const
+export type ExportScope = (typeof EXPORT_SCOPES)[number]
+
+export type ExportWikiInput = { readonly scope: ExportScope }
+
 export type WritePtyInput = { readonly id: number; readonly data: string }
 export type ResizePtyInput = { readonly id: number; readonly cols: number; readonly rows: number }
 export type KillPtyInput = { readonly id: number }
@@ -270,6 +283,41 @@ export type DebtError =
    * screen with nothing saying it is stale.
    */
   | { readonly kind: 'unreachable' }
+
+/**
+ * Where a bundle went. Cancelling the save dialog is an outcome, not a failure:
+ * the reader closed a dialog, and a red sentence for that would be the app
+ * calling an ordinary gesture an error.
+ */
+export type ExportResult =
+  | {
+      readonly kind: 'saved'
+      /** The absolute path the reader chose, shown back to them and nothing else. */
+      readonly path: string
+      readonly files: number
+      readonly bytes: number
+    }
+  | { readonly kind: 'cancelled' }
+
+export type ExportError =
+  | { readonly kind: 'bad-request' }
+  | { readonly kind: 'no-project' }
+  /**
+   * The scope selected no files — a project whose wiki is empty, or a curated
+   * export of one that is all journal. Distinct from a zero-byte success,
+   * because a bundle with nothing in it is not what the reader asked for.
+   */
+  | { readonly kind: 'empty' }
+  /** A file in the plan could not be read; nothing was written. */
+  | { readonly kind: 'unreadable'; readonly detail: string }
+  /**
+   * The zip itself could not be built. Separate from `unwritable` because it
+   * says nothing about the destination the reader chose, and telling them their
+   * folder was at fault sent them to look at the wrong thing.
+   */
+  | { readonly kind: 'unpackable'; readonly detail: string }
+  /** The destination the reader chose could not be written. */
+  | { readonly kind: 'unwritable'; readonly detail: string }
 
 /** Structurally `core.SettingsError`. */
 export type SettingsError =
@@ -462,6 +510,13 @@ export type WikiApi = {
    * ones in `core.CHECKERS`.
    */
   readonly readDebt: () => Promise<Wire<DebtReport, DebtError>>
+  /**
+   * Writes the wiki of the project bound to *this* window into a zip. The
+   * destination comes from a native save dialog and never from the renderer,
+   * which is the whole reason this is the one write that leaves the project: a
+   * renderer-supplied path here would undo the containment rule in one call.
+   */
+  readonly exportWiki: (scope: ExportScope) => Promise<Wire<ExportResult, ExportError>>
   /** What is installed under `~/.claude`, compared with what this build carries. */
   readonly skillStatus: () => Promise<Wire<SkillStatus, SkillError>>
   /**

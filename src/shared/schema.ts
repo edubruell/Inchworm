@@ -21,13 +21,14 @@ import type {
   OpenProjectInput,
   InstallSkillInput,
   ReadFileInput,
+  ExportWikiInput,
   ResizePtyInput,
   SetAccentInput,
   StartPtyInput,
   WriteFileInput,
   WritePtyInput,
 } from './api.js'
-import { MAX_FILE_BYTES, PRESETS, PTY_SCOPES } from './api.js'
+import { EXPORT_SCOPES, MAX_FILE_BYTES, PRESETS, PTY_SCOPES } from './api.js'
 
 /**
  * A project-relative path, refused before it reaches the filesystem: no
@@ -119,6 +120,13 @@ export const writePtyInput: z.ZodType<WritePtyInput> = z.object({
   // cannot push an unbounded string into a shell's input in one message.
   data: z.string().max(100_000),
 })
+
+/**
+ * Which bundle, and nothing else. The renderer names a scope; it never names a
+ * destination — that comes from a native save dialog in main, so the one write
+ * that leaves the project cannot be aimed by the sandboxed half of the app.
+ */
+export const exportWikiInput: z.ZodType<ExportWikiInput> = z.object({ scope: z.enum(EXPORT_SCOPES) })
 
 export const resizePtyInput: z.ZodType<ResizePtyInput> = z.object({ id: ptyId, cols: dimension, rows: dimension })
 export const killPtyInput: z.ZodType<KillPtyInput> = z.object({ id: ptyId })

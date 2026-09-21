@@ -19,6 +19,7 @@ import { basename } from "@core/paths.js";
 import { DEFAULT_SETTINGS } from "@core/settings.js";
 import type { WikiApi } from "@shared/api.js";
 import { Accent } from "./Accent.js";
+import { Export } from "./Export.js";
 import { AgentWindow } from "./AgentWindow.js";
 import { bridge } from "./bridge.js";
 import { createCommandHub } from "./commands.js";
@@ -45,12 +46,20 @@ const Failure = (props: { readonly children: JSX.Element }): JSX.Element => (
 
 const Chrome = (props: {
   readonly header: JSX.Element;
+  /**
+   * The right end of the title bar. Separate from `header` so the spacer
+   * between them lives here rather than in every caller, and absent in a window
+   * with no project: there is nothing to export out of the picker.
+   */
+  readonly actions?: JSX.Element;
   readonly children: JSX.Element;
 }): JSX.Element => (
   <div class="flex h-screen flex-col">
     <div class="h-1 w-full bg-accent" />
-    <header class="drag flex h-11 shrink-0 items-center gap-2 pl-24 font-medium">
+    <header class="drag flex h-11 shrink-0 items-center gap-2 pr-3 pl-24 font-medium">
       {props.header}
+      <div class="flex-1" />
+      {props.actions}
     </header>
     <main class="flex min-h-0 flex-1 flex-col border-t border-hairline">
       {props.children}
@@ -145,6 +154,11 @@ const Window = (props: { readonly api: WikiApi }): JSX.Element => {
 
   return (
     <Chrome
+      actions={
+        <Show when={project()}>
+          <Export api={props.api} />
+        </Show>
+      }
       header={
         <Show
           when={project()}

@@ -12,6 +12,9 @@ import type {
   Command,
   DebtError,
   DebtReport,
+  ExportError,
+  ExportResult,
+  ExportScope,
   FileStamp,
   PtyError,
   PtyEvent,
@@ -63,6 +66,10 @@ export type FakeApi = {
   readonly scopes: readonly (string | undefined)[]
   /** Settings the sheet saved, in order. */
   readonly saved: readonly Settings[]
+  /** Export scopes asked for, in order. The renderer sends a word, never a path. */
+  readonly exported: () => readonly ExportScope[]
+  /** Lets a deferred export finish, so "while it is in flight" is a testable state. */
+  readonly settleExport: () => void
   /** The guard digest each install carried, in order — a stale one is assertable. */
   readonly installs: readonly string[]
   /** Push a settings broadcast at the window, as main would. */
@@ -124,10 +131,19 @@ export const fakeApi = (options: {
   readonly refuseDebt?: DebtError | undefined
   /** Make the bridge itself fail: `invoke` rejects, as it does with no handler. */
   readonly rejectDebt?: boolean | undefined
+  /** What an export answered; a saved bundle by default. `cancelled` is a success. */
+  readonly exportResult?: ExportResult | undefined
+  readonly refuseExport?: ExportError | undefined
+  /** The bridge itself failing, as it does with no handler registered. */
+  readonly rejectExport?: boolean | undefined
+  /** Hold the export open until `settleExport`, so the busy state can be seen. */
+  readonly deferExport?: boolean | undefined
 }): FakeApi => {
   const commands = new Set<(command: Command) => void>()
   const events = new Set<(event: ProjectEvent) => void>()
   const accents: number[] = []
+  const exported: ExportScope[] = []
+  let releaseExport = (): void => undefined
   const reads: string[] = []
   const opened: string[] = []
   const writes: { readonly path: string; readonly text: string; readonly baseSha: string }[] = []
@@ -168,6 +184,10 @@ export const fakeApi = (options: {
     output: (event): void => {
       for (const listener of [...ptys]) listener(event)
     },
+    exported: () => exported,
+    settleExport: (): void => {
+      releaseExport()
+    },
     agentWindows: () => agentWindows,
     livePanes: () => live.size,
     debtReads: () => debtReads,
@@ -188,6 +208,20 @@ export const fakeApi = (options: {
             ? { ok: true, value: { dir, name: dir, hue: 210, lastOpenedMs: 0 } }
             : { ok: false, error: options.refuseOpen },
         )
+      },
+      exportWiki: (scope: ExportScope): Promise<Wire<ExportResult, ExportError>> => {
+        exported.push(scope)
+        if (options.rejectExport === true) return Promise.reject(new Error('no handler registered'))
+        const answer: Wire<ExportResult, ExportError> =
+          options.refuseExport === undefined
+            ? { ok: true, value: options.exportResult ?? { kind: 'saved', path: '/tmp/bundle.zip', files: 3, bytes: 4096 } }
+            : { ok: false, error: options.refuseExport }
+        if (options.deferExport !== true) return Promise.resolve(answer)
+        return new Promise<Wire<ExportResult, ExportError>>((resolve) => {
+          releaseExport = (): void => {
+            resolve(answer)
+          }
+        })
       },
       listProjects: () => Promise.resolve(options.recent ?? []),
       readDebt: (): Promise<Wire<DebtReport, DebtError>> => {

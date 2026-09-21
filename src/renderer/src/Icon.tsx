@@ -38,6 +38,8 @@ const PATHS = {
   plus: 'M12 5v14 M5 12h14',
   /** A minus in the same weight: remove one. */
   remove: 'M5 12h14',
+  /** An arrow out of a tray, the mirror of `save`: the wiki leaving the repo. */
+  export: 'M12 4v12 M8 8l4-4 4 4 M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2',
   down: 'M6 9l6 6 6-6',
   up: 'M6 15l6-6 6 6',
   /** Two stacked panes, the top one taller: the 70/30 split. */

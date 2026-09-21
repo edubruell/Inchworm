@@ -1,12 +1,12 @@
 /** A throwaway project: two watched directories, one file outside them both. */
 
-import { mkdir, mkdtemp, readFile, rm, symlink, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { beforeEach, describe, expect, test } from 'vitest'
 import type { Layout } from '@shared/api.js'
 import { MAX_FILE_BYTES } from '@shared/api.js'
-import { listWikiFiles, readWikiFile, watchTargets, writeWikiFile } from './files.js'
+import { listWikiFiles, readWikiBytes, readWikiFile, watchTargets, writeWikiFile } from './files.js'
 
 const layout: Layout = { wikiRoot: 'wiki/', journal: 'notes/', kind: 'software' }
 
@@ -76,6 +76,40 @@ describe('watchTargets', () => {
       join(root, 'wiki/'),
       join(root, 'notes/'),
     ])
+  })
+})
+
+describe('readWikiBytes', () => {
+  /*
+   * The reason the read path was split in two. The editor wants text; the
+   * exporter wants the bytes as they are, and a utf-8 round trip through a
+   * string replaces anything malformed with U+FFFD — the app rewriting
+   * something the reader did not type, on the way out of the project.
+   */
+  test('hands back the bytes, where readWikiFile hands back a lossy decode', async () => {
+    const raw = Buffer.from([0x61, 0x80, 0x0a])
+    await writeFile(join(root, 'wiki/02_raw.md'), raw)
+    const bytes = await readWikiBytes(root, layout, 'wiki/02_raw.md')
+    expect(bytes.ok && bytes.value.bytes.equals(raw)).toBe(true)
+    const text = await readWikiFile(root, layout, 'wiki/02_raw.md')
+    expect(text.ok && text.value.text).toContain('\uFFFD')
+  })
+
+  test('reports the file’s own mtime', async () => {
+    const info = await stat(join(root, 'wiki/00_state.md'))
+    const read = await readWikiBytes(root, layout, 'wiki/00_state.md')
+    expect(read.ok && read.value.mtimeMs).toBe(info.mtimeMs)
+  })
+
+  // The same four checks the editor's read goes through: the split kept them
+  // on the shared path rather than copying them.
+  test('refuses a path outside the project, and one that is not there', async () => {
+    expect(await readWikiBytes(root, layout, '../outside.md')).toEqual({
+      ok: false,
+      error: { kind: 'outside-project' },
+    })
+    expect(await readWikiBytes(root, layout, 'src.ts')).toEqual({ ok: false, error: { kind: 'outside-project' } })
+    expect(await readWikiBytes(root, layout, 'wiki/99_gone.md')).toEqual({ ok: false, error: { kind: 'not-found' } })
   })
 })
 

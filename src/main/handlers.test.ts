@@ -6,6 +6,9 @@
  */
 
 import { join } from 'node:path'
+import { mkdtemp, readFile, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { unzipSync } from 'fflate'
 import { describe, expect, test } from 'vitest'
 import { hueForPath } from '@core/hue.js'
 import type { ProjectEvent, ProjectSummary, Settings } from '@shared/api.js'
@@ -46,6 +49,10 @@ type Harness = {
   readonly skillInstalls: readonly string[]
   /** Every project directory a debt read was scoped to. */
   readonly debtReads: readonly string[]
+  /** Every filename the save dialog was opened with, in order. */
+  readonly bundles: readonly string[]
+  /** The window each save dialog was hung off — a floating panel is assertable. */
+  readonly bundleOwners: readonly (number | undefined)[]
   /** Settings as the store holds them now, and every broadcast of them. */
   readonly settingsNow: () => Settings
   readonly settingsBroadcasts: Settings[]
@@ -55,6 +62,11 @@ const harness = (
   attached: OpenProject | 'no-project' = sample,
   second?: OpenProject,
   startingSettings: Settings = DEFAULT_SETTINGS,
+  /**
+   * Where an export should land. Absent means the dialog cancels, which is what
+   * every test that is not about the bundle's contents wants: nothing on disk.
+   */
+  bundleTo?: string,
 ): Harness => {
   const registered = new Map<string, (event: IpcEventLike, payload: unknown) => unknown>()
   const opened: OpenProject[] = []
@@ -73,6 +85,8 @@ const harness = (
   if (second !== undefined) registry.attach(2, second)
 
   const debtReads: string[] = []
+  const bundles: string[] = []
+  const bundleOwners: (number | undefined)[] = []
   const agentWindows: string[] = []
   const focused: number[] = []
 
@@ -101,7 +115,9 @@ const harness = (
       list: () => summaries,
       find: (dir) => summaries.find((summary) => summary.dir === dir),
       remember: (dir, lastOpenedMs) => {
-        const summary = { dir, name: 'sample-wiki', hue: hues.get(dir) ?? hueForPath(dir), lastOpenedMs }
+        // Deliberately *not* the folder's basename: `?? basename(dir)` is a
+        // fallback, and a stub that agrees with it tests neither branch.
+        const summary = { dir, name: 'renamed', hue: hues.get(dir) ?? hueForPath(dir), lastOpenedMs }
         summaries.push(summary)
         return Promise.resolve(summary)
       },
@@ -112,6 +128,13 @@ const harness = (
     },
     windowIdOf: (event) => (event.sender as { readonly id?: number }).id,
     chooseDirectory: () => Promise.resolve('/chosen'),
+    // Records the suggested name and the window it was hung off, then cancels
+    // unless a test asked for a destination — nothing here writes by accident.
+    saveBundle: (suggestedName, windowId) => {
+      bundles.push(suggestedName)
+      bundleOwners.push(windowId)
+      return Promise.resolve(bundleTo)
+    },
     openWindow: (project) => opened.push(project),
     openAgentWindow: (dir) => agentWindows.push(dir),
     focusWindow: (id) => focused.push(id),
@@ -162,6 +185,8 @@ const harness = (
     settingsBroadcasts,
     skillInstalls,
     debtReads,
+    bundles,
+    bundleOwners,
     call: (channel, payload, windowId = 1) =>
       Promise.resolve(registered.get(channel)?.({ sender: { id: windowId } }, payload)),
   }
@@ -695,6 +720,87 @@ describe('the skill install', () => {
       expect(await app.call(CHANNEL.installSkill, payload)).toEqual({ ok: false, error: { kind: 'bad-request' } })
     }
     expect(app.skillInstalls).toEqual([])
+  })
+})
+
+describe('wiki:export', () => {
+  // The renderer sends a word. Everything else — which files, which project,
+  // where the zip lands — is main's, and this is where that is asserted.
+  test('scopes the bundle by the sending window, and names it after that project', async () => {
+    const app = harness(sample, edge)
+    await app.call(CHANNEL.exportWiki, { scope: 'curated' }, 2)
+    expect(app.bundles.at(0)).toMatch(/^edge-cases-notes-\d{4}-\d{2}-\d{2}\.zip$/)
+  })
+
+  test('the scope reaches the filename', async () => {
+    const app = harness()
+    await app.call(CHANNEL.exportWiki, { scope: 'everything' })
+    expect(app.bundles.at(0)).toContain('-wiki-')
+  })
+
+  test('a window with no project has nothing to export, and no dialog opens', async () => {
+    const app = harness('no-project')
+    expect(await app.call(CHANNEL.exportWiki, { scope: 'everything' })).toEqual({
+      ok: false,
+      error: { kind: 'no-project' },
+    })
+    expect(app.bundles).toEqual([])
+  })
+
+  test('a scope the schema does not know is refused before anything is read', async () => {
+    const app = harness()
+    expect(await app.call(CHANNEL.exportWiki, { scope: 'everything-plus-the-repo' })).toEqual({
+      ok: false,
+      error: { kind: 'bad-request' },
+    })
+    expect(app.bundles).toEqual([])
+  })
+
+  // The payload carries a scope and nothing else: a destination in it must not
+  // reach the dialog, or the containment rule ends at the first export.
+  test('a destination in the payload is ignored', async () => {
+    const app = harness()
+    await app.call(CHANNEL.exportWiki, { scope: 'curated', path: '/etc/passwd', dir: '/etc' })
+    expect(app.bundles.at(0)).toMatch(/^sample-wiki-notes-\d{4}-\d{2}-\d{2}\.zip$/)
+  })
+
+  test('the save dialog is hung off the window that asked, not left floating', async () => {
+    const app = harness(sample, edge)
+    await app.call(CHANNEL.exportWiki, { scope: 'curated' }, 2)
+    expect(app.bundleOwners).toEqual([2])
+  })
+
+  /*
+   * The filename rhymes with the right project; the *contents* are the claim.
+   * Every other project-scoped channel asserts its scoped effect, and until
+   * this one did too, a handler that exported the wrong window's wiki would
+   * have passed.
+   */
+  test('the bundle holds the sending window\u2019s project, and none of the other', async () => {
+    const destination = join(await mkdtemp(join(tmpdir(), 'inchworm-handler-')), 'bundle.zip')
+    const app = harness(sample, edge, DEFAULT_SETTINGS, destination)
+    const result = await app.call(CHANNEL.exportWiki, { scope: 'everything' }, 2)
+    expect(result).toMatchObject({ ok: true, value: { kind: 'saved' } })
+    const names = Object.keys(unzipSync(new Uint8Array(await readFile(destination))))
+    // `edge-cases` has a `wiki/drafts/` that `sample-wiki` does not.
+    expect(names.some((name) => name.includes('drafts/'))).toBe(true)
+    expect(names.some((name) => name.includes('01_scope.md'))).toBe(false)
+    await rm(destination, { force: true })
+  })
+
+  // `basename(project.dir)` is only the fallback: a project the store has
+  // renamed must export under the name the reader gave it.
+  test('a project the store remembers exports under the remembered name', async () => {
+    const app = harness()
+    await app.call(CHANNEL.openProject, { dir: sample.dir })
+    await app.call(CHANNEL.exportWiki, { scope: 'everything' })
+    expect(app.bundles.at(0)).toMatch(/^renamed-wiki-\d{4}-\d{2}-\d{2}\.zip$/)
+  })
+
+  test('a project the store has never seen falls back to its folder name', async () => {
+    const app = harness()
+    await app.call(CHANNEL.exportWiki, { scope: 'everything' })
+    expect(app.bundles.at(0)).toMatch(/^sample-wiki-wiki-\d{4}-\d{2}-\d{2}\.zip$/)
   })
 })
 

@@ -8,8 +8,9 @@ and the reader that renders it ship together.
 
 Status: shipped and in daily use — the viewer, the CodeMirror source editor with
 its sha-guarded save, the register append affordance, the xterm + node-pty
-drawer, the debt section, the Settings sheet and a packaged dmg. What is left is
-release polish (notarization), the **Windows and Linux ports** — raised from
+drawer, the debt section, the Settings sheet, the wiki zip export and a packaged
+dmg. What is left is release polish (notarization), the **Windows and Linux
+ports** — raised from
 non-goals to medium-term goals on 2026-09-08, surveyed unbuilt in wiki
 `07_platform_ports` — and the feature ideas in the wiki's `ideas.md`.
 
@@ -36,7 +37,9 @@ inside a module (wiki `07_platform_ports`).
   scoped by the *sending window*. `contextIsolation`, `sandbox`, no
   `nodeIntegration`. Reads and writes reach the wiki root, the journal and the
   agent file — `CLAUDE.md` **or** `AGENTS.md` (`core/schema.ts:AGENT_FILES`) —
-  never the rest of the repository.
+  never the rest of the repository. **One write goes where the *reader* points**:
+  the export bundle, whose destination comes from a native save dialog and never
+  from a payload (`main/export.ts`, wiki `01_product_scope` surface 7).
 - **`src/core` is pure** — no DOM, no node builtins, no I/O. All llmwiki schema
   knowledge lives there; no component may regex a filename. A rule about the
   schema lands in `core` with its tests before any component shows it.

@@ -42,6 +42,7 @@ const fakeApi = (texts: Map<string, string>): Fake => {
       chooseProject: () => Promise.reject(new Error('unused')),
       openProject: () => Promise.reject(new Error('unused')),
       listProjects: () => Promise.reject(new Error('unused')),
+      exportWiki: () => Promise.reject(new Error('unused')),
       currentProject: () => Promise.reject(new Error('unused')),
       currentPending: () => Promise.reject(new Error('unused')),
       openAgentWindow: () => Promise.reject(new Error('unused')),

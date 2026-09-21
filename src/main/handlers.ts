@@ -13,6 +13,8 @@ import { err, ok } from '@core/result.js'
 import type {
   DebtError,
   DebtReport,
+  ExportError,
+  ExportResult,
   PtyError,
   FileContent,
   FileError,
@@ -31,6 +33,7 @@ import type {
 } from '@shared/api.js'
 import { CHANNEL } from '@shared/api.js'
 import {
+  exportWikiInput,
   installSkillInput,
   killPtyInput,
   openExternalInput,
@@ -43,6 +46,8 @@ import {
   writeFileInput,
   writePtyInput,
 } from '@shared/schema.js'
+import { exportWiki } from './export.js'
+import type { SaveDialog } from './export.js'
 import { listWikiFiles, readWikiFile, writeWikiFile } from './files.js'
 import type { DebtHost } from './debt.js'
 import { loadProject, type OpenProject } from './project.js'
@@ -71,6 +76,12 @@ export type HandlerDeps = {
   /** The window an IPC message came from; `undefined` if it has already gone. */
   readonly windowIdOf: (event: IpcEventLike) => number | undefined
   readonly chooseDirectory: () => Promise<string | undefined>
+  /**
+   * Where an export bundle goes. The only write target in the app that a
+   * *reader* names, and a native dialog for exactly that reason: they point at
+   * it, never the renderer.
+   */
+  readonly saveBundle: SaveDialog
   readonly openWindow: (project: OpenProject) => void
   /**
    * A window on a folder that is *not* a project yet: the terminal-only agent
@@ -206,6 +217,34 @@ export const registerHandlers = (ipc: IpcHandleLike, deps: HandlerDeps): void =>
     // Every window on the project, not just the sender: answering only the
     // sender leaves the other windows showing a colour nothing has any more.
     deps.broadcast(project.dir, { kind: 'accent', dir: project.dir, hue: input.data.hue })
+  })
+
+  /**
+   * The wiki, out of the repository and into a zip the reader can carry to
+   * another machine or send to someone. Scoped like every other file call — by
+   * the project bound to the *sending window* — and the renderer names a scope
+   * rather than a destination or a file list: `core.exportPlan` decides which
+   * files a scope means, and the save dialog decides where they land.
+   */
+  ipc.handle(CHANNEL.exportWiki, async (event, payload): Promise<Wire<ExportResult, ExportError>> => {
+    const input = exportWikiInput.safeParse(payload)
+    if (!input.success) return err({ kind: 'bad-request' })
+    const project = projectOf(event)
+    if (project === undefined) return err({ kind: 'no-project' })
+    return exportWiki(
+      {
+        dir: project.dir,
+        name: deps.store.find(project.dir)?.name ?? basename(project.dir),
+        layout: project.layout,
+        files: await listWikiFiles(project.dir, project.layout),
+        scope: input.data.scope,
+        // The local day, in the shape the registers use — `toISOString` is UTC
+        // and would date an evening export tomorrow.
+        date: new Date(deps.now()).toLocaleDateString('en-CA'),
+        windowId: deps.windowIdOf(event),
+      },
+      deps.saveBundle,
+    )
   })
 
   ipc.handle(CHANNEL.readFile, async (event, payload): Promise<Wire<FileContent, FileError>> => {

@@ -66,6 +66,29 @@ const setDevDockIcon = (): void => {
 const skillSource = (): string =>
   app.isPackaged ? join(process.resourcesPath, 'skills', 'llmwiki') : join(app.getAppPath(), 'skills', 'llmwiki')
 
+/**
+ * Where an export bundle is written. The suggested name comes from `core`; the
+ * path comes from the reader, and from nowhere else — this is the app's one
+ * write to a path a *reader* names, and a dialog is what makes that safe. (The
+ * stores and the skill installer also write outside a project; those paths are
+ * the app's own.)
+ */
+const saveBundle = async (suggestedName: string, windowId: number | undefined): Promise<string | undefined> => {
+  const options = {
+    defaultPath: join(app.getPath('downloads'), suggestedName),
+    filters: [{ name: 'Zip archive', extensions: ['zip'] }],
+    message: 'Where to put this wiki',
+  }
+  // Hung off the asking window when it is still there, so the panel is a sheet
+  // on the project it belongs to rather than a floating one among several.
+  const owner = windowId === undefined ? undefined : BrowserWindow.fromId(windowId)
+  const result = await (owner === null || owner === undefined
+    ? dialog.showSaveDialog(options)
+    : dialog.showSaveDialog(owner, options))
+  // `canceled: false` with an empty path is reachable, and would reach `writeFile('')`.
+  return result.canceled || result.filePath === '' ? undefined : result.filePath
+}
+
 const chooseDirectory = async (): Promise<string | undefined> => {
   const result = await dialog.showOpenDialog({
     properties: ['openDirectory'],
@@ -225,6 +248,7 @@ const start = async (): Promise<void> => {
     windowIdOf: (event: IpcEventLike): number | undefined =>
       BrowserWindow.fromWebContents(event.sender as WebContents)?.id,
     chooseDirectory,
+    saveBundle,
     openWindow,
     openAgentWindow,
     focusWindow: (id: number): void => {

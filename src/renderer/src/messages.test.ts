@@ -4,8 +4,17 @@
  */
 
 import { describe, expect, test } from 'vitest'
-import type { FileError, OpenProjectError, SettingsError, SkillError } from '@shared/api.js'
-import { fileMessage, markerAdvice, openProjectMessage, ptyMessage, settingsMessage, skillMessage, skillStateMessage } from './messages.js'
+import type { ExportError, FileError, OpenProjectError, SettingsError, SkillError } from '@shared/api.js'
+import {
+  exportMessage,
+  fileMessage,
+  markerAdvice,
+  openProjectMessage,
+  ptyMessage,
+  settingsMessage,
+  skillMessage,
+  skillStateMessage,
+} from './messages.js'
 
 const fileErrors: readonly FileError[] = [
   { kind: 'bad-request' },
@@ -32,6 +41,15 @@ const settingsErrors: readonly SettingsError[] = [
   { kind: 'too-long', field: 'command' },
   { kind: 'duplicate-id' },
   { kind: 'bad-tag' },
+]
+
+const exportErrors: readonly ExportError[] = [
+  { kind: 'bad-request' },
+  { kind: 'no-project' },
+  { kind: 'empty' },
+  { kind: 'unreadable', detail: 'wiki/00_state.md (not-found)' },
+  { kind: 'unpackable', detail: 'date not in range 1980-2099' },
+  { kind: 'unwritable', detail: 'EROFS' },
 ]
 
 const skillErrors: SkillError[] = [
@@ -75,6 +93,26 @@ describe('every wire error becomes a sentence', () => {
 
   test('the size a file was refused at is shown in kB', () => {
     expect(fileMessage({ kind: 'too-large', bytes: 2_500_000 })).toContain('2500 kB')
+  })
+
+  test.each(exportErrors)('exportMessage($kind)', (error) => {
+    const message = exportMessage(error)
+    expect(message.length).toBeGreaterThan(10)
+    expect(message).not.toContain(error.kind)
+  })
+
+  // "A file could not be read" over a wiki of forty files is not a report, and
+  // the reader must not go looking at the folder they chose.
+  test('a file that could not be read names itself and says nothing was written', () => {
+    const message = exportMessage({ kind: 'unreadable', detail: 'wiki/00_state.md (not-found)' })
+    expect(message).toContain('wiki/00_state.md')
+    expect(message).toContain('nothing was written')
+  })
+
+  // A zip that could not be built says nothing about the destination, and a
+  // sentence that blames it sends the reader to look at the wrong thing.
+  test('a bundle that could not be packed does not blame the destination', () => {
+    expect(exportMessage({ kind: 'unpackable', detail: 'x' })).not.toContain('written')
   })
 
   test.each(settingsErrors)('settingsMessage($kind)', (error) => {

@@ -4,7 +4,15 @@
  * the single place it becomes English.
  */
 
-import type { FileError, OpenProjectError, PtyError, SettingsError, SkillError, SkillStatus } from '@shared/api.js'
+import type {
+  ExportError,
+  FileError,
+  OpenProjectError,
+  PtyError,
+  SettingsError,
+  SkillError,
+  SkillStatus,
+} from '@shared/api.js'
 
 /** The same sentence in both mappers: a malformed payload is one failure, not two. */
 const BAD_REQUEST = 'That request was malformed — this is a bug in the app.'
@@ -99,6 +107,28 @@ export const fileMessage = (error: FileError): string => {
       return 'The file changed on disk since it was opened.'
     case 'no-project':
       return 'This window has no project open.'
+  }
+}
+
+export const exportMessage = (error: ExportError): string => {
+  switch (error.kind) {
+    case 'bad-request':
+      return BAD_REQUEST
+    case 'no-project':
+      return 'This window has no project to export.'
+    case 'empty':
+      // The scope, not the wiki: a curated export of a project that is all
+      // journal is empty while the project plainly is not.
+      return 'Nothing in this project matches that scope.'
+    case 'unreadable':
+      // The file is named in the detail, because "a file" over forty of them
+      // is not something the reader can act on.
+      return `A file could not be read, so nothing was written: ${error.detail}`
+    case 'unpackable':
+      // Not the destination's fault, and the sentence must not imply it is.
+      return `The bundle could not be packed: ${error.detail}`
+    case 'unwritable':
+      return `The bundle could not be written: ${error.detail}`
   }
 }
 

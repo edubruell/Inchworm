@@ -16,6 +16,9 @@ import type {
   WritePtyInput,
   DebtError,
   DebtReport,
+  ExportError,
+  ExportResult,
+  ExportScope,
   FileContent,
   FileError,
   FileStamp,
@@ -150,6 +153,11 @@ export const createApi = (ipc: IpcInvokeLike, pathForFile: PathForFile): WikiApi
 
   skillStatus: (): Promise<Wire<SkillStatus, SkillError>> =>
     ipc.invoke(CHANNEL.skillStatus) as Promise<Wire<SkillStatus, SkillError>>,
+
+  // A scope, never a destination: the save dialog is main's, so the bridge
+  // cannot aim the one write that leaves the project.
+  exportWiki: (scope: ExportScope): Promise<Wire<ExportResult, ExportError>> =>
+    ipc.invoke(CHANNEL.exportWiki, { scope }) as Promise<Wire<ExportResult, ExportError>>,
 
   readDebt: (): Promise<Wire<DebtReport, DebtError>> =>
     ipc.invoke(CHANNEL.readDebt) as Promise<Wire<DebtReport, DebtError>>,

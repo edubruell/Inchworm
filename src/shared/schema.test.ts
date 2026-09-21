@@ -7,6 +7,7 @@
 import { describe, expect, test } from 'vitest'
 import { MAX_FILE_BYTES } from './api.js'
 import {
+  exportWikiInput,
   hueSchema,
   killPtyInput,
   openExternalInput,
@@ -114,6 +115,19 @@ describe('readFileInput', () => {
   test('is the path schema in a payload', () => {
     expect(readFileInput.safeParse({ path: '../escape.md' }).success).toBe(false)
     expect(readFileInput.safeParse({ path: 'wiki/x.md' }).success).toBe(true)
+  })
+})
+
+describe('exportWikiInput', () => {
+  test('the scope is an enum, and a destination in the payload is not a field', () => {
+    expect(exportWikiInput.safeParse({ scope: 'everything' }).success).toBe(true)
+    expect(exportWikiInput.safeParse({ scope: 'curated' }).success).toBe(true)
+    expect(exportWikiInput.safeParse({ scope: 'the-whole-repo' }).success).toBe(false)
+    expect(exportWikiInput.safeParse({}).success).toBe(false)
+    // Parsed rather than passed through: an extra key is dropped, so a path a
+    // renderer smuggled in cannot reach the dialog.
+    const parsed = exportWikiInput.safeParse({ scope: 'curated', path: '/etc/passwd' })
+    expect(parsed.success && parsed.data).toEqual({ scope: 'curated' })
   })
 })
 

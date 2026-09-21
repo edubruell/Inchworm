@@ -56,6 +56,7 @@ describe('createApi', () => {
         'skillStatus',
         'installSkill',
         'readDebt',
+        'exportWiki',
         'readFile',
         'onSettings',
         'setAccent',
@@ -182,6 +183,14 @@ describe('createApi', () => {
     expect(fake.listeners.get(EVENT.command)?.size).toBe(1)
     off()
     expect(fake.listeners.get(EVENT.command)?.size).toBe(0)
+  })
+})
+
+describe('exportWiki', () => {
+  test('sends the scope and nothing else', async () => {
+    const ipc = recorder()
+    await createApi(ipc.ipc, noPath).exportWiki('curated')
+    expect(ipc.calls).toEqual([[CHANNEL.exportWiki, { scope: 'curated' }]])
   })
 })
 

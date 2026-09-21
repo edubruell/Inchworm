@@ -98,11 +98,18 @@ export const watchTargets = (root: string, layout: Layout): readonly string[] =>
   join(root, layout.journal),
 ]
 
-export const readWikiFile = async (
+/**
+ * The bytes of one wiki file, past all four containment checks. The read path
+ * is here in one place and both callers wrap it: `readWikiFile` decodes for the
+ * editor, and the exporter copies the bytes as they are. A bundle built out of
+ * decoded text would re-encode it, and a malformed byte would come back U+FFFD
+ * — the app rewriting something the reader did not type.
+ */
+export const readWikiBytes = async (
   root: string,
   layout: Layout,
   relPath: string,
-): Promise<Wire<FileContent, FileError>> => {
+): Promise<Wire<{ readonly bytes: Buffer; readonly mtimeMs: number }, FileError>> => {
   const located = await locate(root, layout, relPath)
   if (!located.ok) return located
   try {
@@ -110,11 +117,21 @@ export const readWikiFile = async (
     if (!info.isFile()) return err({ kind: 'not-found' })
     // Refused before the bytes are read, let alone parsed.
     if (info.size > MAX_FILE_BYTES) return err({ kind: 'too-large', bytes: info.size })
-    const bytes = await readFile(located.value)
-    return ok({ path: relPath, text: bytes.toString('utf8'), sha: shaOf(bytes), mtimeMs: info.mtimeMs })
+    return ok({ bytes: await readFile(located.value), mtimeMs: info.mtimeMs })
   } catch (error: unknown) {
     return isMissing(error) ? err({ kind: 'not-found' }) : err({ kind: 'unreadable', detail: detailOf(error) })
   }
+}
+
+export const readWikiFile = async (
+  root: string,
+  layout: Layout,
+  relPath: string,
+): Promise<Wire<FileContent, FileError>> => {
+  const read = await readWikiBytes(root, layout, relPath)
+  if (!read.ok) return read
+  const { bytes, mtimeMs } = read.value
+  return ok({ path: relPath, text: bytes.toString('utf8'), sha: shaOf(bytes), mtimeMs })
 }
 
 /** `''` for a file that is not there — the sha an editor of a new file starts from. */
