@@ -46,8 +46,8 @@ inside a module (wiki `07_platform_ports`).
 - **Byte-faithful saves.** The app never reformats markdown, never sorts a
   register, never trims a file over its cap. No formatter is ever pointed at .md.
 - **Registers are append-only**: new entries at the bottom, from the template.
-  Two of them are tables and get no append affordance at all, rather than a
-  wrong one.
+  Three get no append affordance at all rather than a wrong one — two tables,
+  and the wikilog, whose bullets the `/llmwiki` subcommands write.
 - **Multi-window, one project per window.** Project-scoped state is per project
   and reference-counted; project-scoped IPC events broadcast to every window on
   that project, never just `event.sender`. A pane is the one window-scoped
