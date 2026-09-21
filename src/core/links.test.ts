@@ -136,6 +136,7 @@ describe('buildLinkIndex + resolveLink', () => {
     'wiki/00_state.md',
     'wiki/01_scope.md',
     'wiki/decisions.md',
+    'wiki/wikilog.md',
     'wiki/archive/03_storage.md',
     'wiki/03_storage.md',
     'notes/2026-08-18_swap.md',
@@ -153,6 +154,10 @@ describe('buildLinkIndex + resolveLink', () => {
     // A lettered entry was `other` until 2026-09-15, so a link to the day's
     // second session dangled in a wiki that had written one.
     ['2026-08-18b_second-swap', 'notes/2026-08-18b_second-swap.md'],
+    // `wikilog` was `other` until 2026-09-21, so `buildLinkIndex` skipped it
+    // and every `[[wikilog]]` in a register showed red — including the ones in
+    // this repo's own `decisions.md`.
+    ['wikilog', 'wiki/wikilog.md'],
   ])('[[%s]] resolves to %s', (target, path) => {
     expect(resolveLink(target, index)).toEqual({ status: 'resolved', path })
   })

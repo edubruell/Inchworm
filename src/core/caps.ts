@@ -5,7 +5,12 @@
  */
 
 import type { WikiFileKind } from './classify.js'
-import { CAP } from './schema.js'
+import { CAP, isUncappedRegister, type RegisterName } from './schema.js'
+
+/** An uncapped register reports like a note: a length, no ceiling to breach. Its
+ * own function because `capFor` is at rule 11's complexity ceiling already. */
+const registerCap = (register: RegisterName): number | undefined =>
+  isUncappedRegister(register) ? undefined : CAP.register
 
 /** Amber at 80 % of the cap, red past it. */
 export const NEAR_CAP = 0.8
@@ -26,7 +31,7 @@ export const capFor = (kind: WikiFileKind): number | undefined => {
     case 'state':
       return CAP.state
     case 'register':
-      return CAP.register
+      return registerCap(kind.register)
     case 'claudeMd':
       return CAP.claudeMd
     // Notes, journal entries and archives are deliberately uncapped: they are

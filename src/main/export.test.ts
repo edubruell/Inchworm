@@ -128,6 +128,7 @@ describe('the curated bundle', () => {
       'sample-notes-2026-09-19/wiki/00_state.md',
       'sample-notes-2026-09-19/wiki/01_scope.md',
       'sample-notes-2026-09-19/wiki/decisions.md',
+      'sample-notes-2026-09-19/wiki/wikilog.md',
     ])
   })
 })

@@ -15,7 +15,8 @@ import type { RegisterName } from './schema.js'
  * The registers whose entries *are* blocks appended at the bottom. `budgets`
  * and `deletions` are tables whose rows belong inside the table, not after the
  * prose that follows it — appending there would produce a broken file, so the
- * affordance is absent for them rather than wrong.
+ * affordance is absent for them rather than wrong. `wikilog` is absent too: its
+ * entries are bullets the `/llmwiki` subcommands write, not blocks a reader fills.
  */
 const APPENDABLE = ['ideas', 'decisions', 'contentions', 'findings', 'gotchas', 'tried'] as const
 

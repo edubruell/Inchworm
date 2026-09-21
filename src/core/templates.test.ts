@@ -14,6 +14,9 @@ describe('isAppendable', () => {
     // so there is no affordance rather than a wrong one.
     expect(isAppendable('budgets')).toBe(false)
     expect(isAppendable('deletions')).toBe(false)
+    // `wikilog` is neither block-shaped nor a table: its entries are bullets
+    // written by the `/llmwiki` subcommands, so the reader gets no skeleton.
+    expect(isAppendable('wikilog')).toBe(false)
   })
 })
 
@@ -66,6 +69,10 @@ describe('entryTemplate', () => {
   test('a table-shaped register has no template at all', () => {
     expect(entryTemplate('budgets', { date: '2026-08-20', headings: [] })).toBeUndefined()
     expect(entryTemplate('deletions', { date: '2026-08-20', headings: [] })).toBeUndefined()
+  })
+
+  test('the wikilog has no template either', () => {
+    expect(entryTemplate('wikilog', { date: '2026-08-20', headings: [] })).toBeUndefined()
   })
 
   test('the placeholders are left in, so an unfilled entry looks unfinished', () => {

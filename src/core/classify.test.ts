@@ -30,7 +30,7 @@ describe('classify', () => {
     expect(classify(w(name), layout)).toEqual({ kind: 'note', number, topic })
   })
 
-  test.each(['ideas', 'decisions', 'contentions', 'findings', 'gotchas', 'tried', 'budgets', 'deletions'])(
+  test.each(['ideas', 'decisions', 'contentions', 'findings', 'gotchas', 'tried', 'wikilog', 'budgets', 'deletions'])(
     '%s.md is a register',
     (register) => {
       expect(classify(w(`${register}.md`), layout)).toEqual({ kind: 'register', register })

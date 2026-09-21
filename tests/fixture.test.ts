@@ -49,7 +49,7 @@ describe('the fixture is a valid llmwiki', () => {
       return kind.kind === 'register' ? [kind.register] : []
     })
     expect([...registers].sort()).toEqual(
-      ['budgets', 'contentions', 'decisions', 'deletions', 'findings', 'gotchas', 'ideas', 'tried'].sort(),
+      ['budgets', 'contentions', 'decisions', 'deletions', 'findings', 'gotchas', 'ideas', 'tried', 'wikilog'].sort(),
     )
   })
 
@@ -183,6 +183,9 @@ describe('navigation over the fixture', () => {
       'findings.md',
       'gotchas.md',
       'tried.md',
+      // After `tried` and before the two the software kind adds, which is where
+      // the skill's layout block puts it.
+      'wikilog.md',
       'budgets.md',
       'deletions.md',
     ])

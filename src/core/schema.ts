@@ -11,6 +11,10 @@
 /**
  * Registers, in the order the schema lists them — which is the order the
  * sidebar shows them in. Never alphabetical.
+ *
+ * `wikilog` sits where the skill's layout block puts it, after `tried`. It was
+ * missing here until 2026-09-21, so `classify` called every wikilog `other`:
+ * absent from the sidebar, and `[[wikilog]]` dangling in the reading pane.
  */
 export const REGISTERS = [
   'ideas',
@@ -19,6 +23,7 @@ export const REGISTERS = [
   'findings',
   'gotchas',
   'tried',
+  'wikilog',
   'budgets',
   'deletions',
 ] as const
@@ -27,6 +32,12 @@ export type RegisterName = (typeof REGISTERS)[number]
 
 export const isRegisterName = (name: string): name is RegisterName =>
   (REGISTERS as readonly string[]).includes(name)
+
+/** Uncapped registers: wiki meta, one line per entry, meant to grow forever, so a
+ * gauge counting one towards 100 would report a breach that is not one. */
+export const UNCAPPED_REGISTERS = ['wikilog'] as const
+export const isUncappedRegister = (register: RegisterName): boolean =>
+  (UNCAPPED_REGISTERS as readonly string[]).includes(register)
 
 /**
  * Hard line caps. Past the cap nobody reads the file, so an append-only log

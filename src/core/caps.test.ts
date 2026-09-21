@@ -12,6 +12,10 @@ describe('capFor', () => {
   test.each<[WikiFileKind, number | undefined]>([
     [{ kind: 'state' }, 60],
     [{ kind: 'register', register: 'decisions' }, 100],
+    // `wikilog` is a register and the schema leaves it uncapped: it holds wiki
+    // meta, one line per entry, and is meant to grow forever, so counting it
+    // towards 100 would report a breach that is not one.
+    [{ kind: 'register', register: 'wikilog' }, undefined],
     [{ kind: 'claudeMd' }, 150],
     [{ kind: 'note', number: 2, topic: 'design' }, undefined],
     [{ kind: 'journal', date: '2026-08-18', session: '', slug: 'a' }, undefined],

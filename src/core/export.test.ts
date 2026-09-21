@@ -11,8 +11,6 @@ const FILES = [
   'local_context/wiki/00_state.md',
   'local_context/wiki/01_scope.md',
   'local_context/wiki/decisions.md',
-  // `wikilog.md` is written by the skill and is not in `schema.ts:REGISTERS`,
-  // so `classify` calls it `other` — the file the kind-based plan used to drop.
   'local_context/wiki/wikilog.md',
   'local_context/wiki/decisions_table.md',
   'local_context/wiki/drafts/09_draft.md',
@@ -63,7 +61,17 @@ describe('exportPlan', () => {
       'local_context/wiki/00_state.md',
       'local_context/wiki/01_scope.md',
       'local_context/wiki/decisions.md',
+      'local_context/wiki/wikilog.md',
     ])
+  })
+
+  // `wikilog` became a register on 2026-09-21 and so joined `curated` with the
+  // rest of them. That is the right answer rather than an accident of the list:
+  // the bundle a partner gets drops `archive/`, and the wikilog is the file
+  // that says a register was split and where its bodies went — without it the
+  // missing bodies read as deletions.
+  test('the curated bundle carries the wikilog', () => {
+    expect(exportPlan(FILES, layout, 'curated')).toContain('local_context/wiki/wikilog.md')
   })
 
   // The agent file is tracked in git and arrives with the repository, so a copy

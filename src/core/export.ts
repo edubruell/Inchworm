@@ -25,17 +25,13 @@ import type { ProjectLayout } from './project.js'
 import type { ExportScope } from '@shared/api.js'
 
 /**
- * **`everything` is by location, not by kind**, and that is a correction rather
- * than a shortcut. Selecting the five kinds `classify` names silently dropped
- * every file it calls `other`: `wikilog.md`, which the skill writes and
- * `schema.ts:REGISTERS` has never learned; a `<register>_<table>.md` the schema
- * tells projects to split out; a note in a wiki sub-folder; an attachment that
- * is not markdown; and — worst — the *entire journal* of a project that
- * declares its journal inside its wiki root, a layout `parseClaudeBlock`
- * accepts. A bundle that calls itself the whole wiki and quietly leaves files
- * behind is worse than one that carries a file nobody asked for.
- *
- * `curated` stays by kind, because there leaving things out is the point.
+ * **`everything` is by location, not by kind.** Selecting the kinds `classify`
+ * names dropped every file it calls `other`: a `<register>_<table>.md`, a note
+ * in a sub-folder, an attachment that is not markdown, and — worst — the whole
+ * journal of a project that declares it inside its wiki root, a layout
+ * `parseClaudeBlock` accepts. `curated` stays by kind: there, leaving things
+ * out is the point, and it takes the wikilog with the rest of the registers
+ * because the bundle drops `archive/` and the wikilog says where bodies went.
  */
 const CURATED: readonly WikiFileKind['kind'][] = ['state', 'note', 'register']
 
